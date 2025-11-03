@@ -353,3 +353,10 @@ class AsyncSandbox(Sandbox):
         return await loop.run_in_executor(
             None, super().is_healthy
         )
+
+    @property
+    def exec(self):
+        """Get async command execution interface"""
+        from .exec import AsyncSandboxExecutor
+
+        return AsyncSandboxExecutor(self)

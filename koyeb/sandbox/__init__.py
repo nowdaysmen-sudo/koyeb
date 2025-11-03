@@ -8,20 +8,27 @@ __version__ = "1.0.3"
 
 from koyeb.api.models.instance_status import InstanceStatus as SandboxStatus
 
-from .exec import CommandResult, CommandStatus, SandboxCommandError, SandboxExecutor
+from .exec import (
+    AsyncSandboxExecutor,
+    CommandResult,
+    CommandStatus,
+    SandboxCommandError,
+    SandboxExecutor,
+)
 from .filesystem import FileInfo, SandboxFilesystem
 from .sandbox import Sandbox, AsyncSandbox
 from .utils import SandboxError
 
 __all__ = [
     "Sandbox",
+    "AsyncSandbox",
     "SandboxFilesystem",
     "SandboxExecutor",
+    "AsyncSandboxExecutor",
     "FileInfo",
     "SandboxStatus",
     "SandboxError",
     "CommandResult",
     "CommandStatus",
     "SandboxCommandError",
-    "AsyncSandbox",
 ]

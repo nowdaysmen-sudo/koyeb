@@ -64,14 +64,16 @@ class SandboxCommandError(SandboxError):
 
 class SandboxExecutor:
     """
-    Command execution interface for Koyeb Sandbox instances.
+    Synchronous command execution interface for Koyeb Sandbox instances.
     Bound to a specific sandbox instance.
+    
+    For async usage, use AsyncSandboxExecutor instead.
     """
 
     def __init__(self, sandbox):
         self.sandbox = sandbox
 
-    async def __call__(
+    def __call__(
         self,
         command: str,
         cwd: Optional[str] = None,
@@ -81,7 +83,7 @@ class SandboxExecutor:
         on_stderr: Optional[Callable[[str], None]] = None,
     ) -> CommandResult:
         """
-        Execute a command in a shell. Supports streaming output via callbacks.
+        Execute a command in a shell synchronously. Supports streaming output via callbacks.
 
         Args:
             command: Command to execute as a string (e.g., "python -c 'print(2+2)'")
@@ -96,10 +98,68 @@ class SandboxExecutor:
 
         Example:
             ```python
-            # Without streaming
+            # Synchronous execution
+            result = sandbox.exec("echo hello")
+
+            # With streaming callbacks
+            result = sandbox.exec(
+                "echo hello; sleep 1; echo world",
+                on_stdout=lambda data: print(f"OUT: {data}"),
+                on_stderr=lambda data: print(f"ERR: {data}"),
+            )
+            ```
+        """
+        return asyncio.run(
+            _exec_async(
+                instance_id=self.sandbox.instance_id,
+                command=command,
+                cwd=cwd,
+                env=env,
+                timeout=timeout,
+                api_token=self.sandbox.api_token,
+                on_stdout=on_stdout,
+                on_stderr=on_stderr,
+            )
+        )
+
+
+class AsyncSandboxExecutor(SandboxExecutor):
+    """
+    Async command execution interface for Koyeb Sandbox instances.
+    Bound to a specific sandbox instance.
+    
+    Inherits from SandboxExecutor and provides async command execution.
+    """
+
+    async def __call__(
+        self,
+        command: str,
+        cwd: Optional[str] = None,
+        env: Optional[Dict[str, str]] = None,
+        timeout: int = 30,
+        on_stdout: Optional[Callable[[str], None]] = None,
+        on_stderr: Optional[Callable[[str], None]] = None,
+    ) -> CommandResult:
+        """
+        Execute a command in a shell asynchronously. Supports streaming output via callbacks.
+
+        Args:
+            command: Command to execute as a string (e.g., "python -c 'print(2+2)'")
+            cwd: Working directory for the command
+            env: Environment variables for the command
+            timeout: Command timeout in seconds
+            on_stdout: Optional callback for streaming stdout chunks
+            on_stderr: Optional callback for streaming stderr chunks
+
+        Returns:
+            CommandResult: Result of the command execution
+
+        Example:
+            ```python
+            # Async execution
             result = await sandbox.exec("echo hello")
 
-            # With streaming
+            # With streaming callbacks
             result = await sandbox.exec(
                 "echo hello; sleep 1; echo world",
                 on_stdout=lambda data: print(f"OUT: {data}"),
