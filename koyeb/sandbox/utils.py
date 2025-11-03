@@ -109,7 +109,7 @@ def create_deployment_definition(
         DeploymentDefinition object
     """
     if regions is None:
-        regions = ["na"]
+        regions = ["eu"]
 
     deployment_type = (
         DeploymentDefinitionType.WEB if ports else DeploymentDefinitionType.WORKER
