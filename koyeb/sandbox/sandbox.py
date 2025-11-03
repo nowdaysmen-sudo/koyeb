@@ -1,7 +1,7 @@
 # coding: utf-8
 
 """
-Async Koyeb Sandbox - Python SDK for creating and managing Koyeb sandboxes asynchronously
+Koyeb Sandbox - Python SDK for creating and managing Koyeb sandboxes
 """
 
 import asyncio
@@ -22,8 +22,8 @@ from .utils import (
 
 class Sandbox:
     """
-    Async sandbox for running code on Koyeb infrastructure.
-    Provides async creation and deletion functionality with proper health polling.
+    Synchronous sandbox for running code on Koyeb infrastructure.
+    Provides creation and deletion functionality with proper health polling.
     """
 
     def __init__(
@@ -44,7 +44,7 @@ class Sandbox:
         self._created_at = time.time()
 
     @classmethod
-    async def create(
+    def create(
         cls,
         image: str = "docker.io/library/ubuntu:latest",
         name: str = "quick-sandbox",
@@ -57,7 +57,7 @@ class Sandbox:
         timeout: int = 300,
     ) -> "Sandbox":
         """
-            Create a new sandbox instance with async support.
+            Create a new sandbox instance.
 
             Args:
                 image: Docker image to use (default: ubuntu:latest)
@@ -82,23 +82,19 @@ class Sandbox:
                     "API token is required. Set KOYEB_API_TOKEN environment variable or pass api_token parameter"
                 )
 
-        loop = asyncio.get_running_loop()
-        sandbox = await loop.run_in_executor(
-            None,
-            lambda: cls._create_sync(
-                name=name,
-                image=image,
-                instance_type=instance_type,
-                ports=ports,
-                env=env,
-                regions=regions,
-                api_token=api_token,
-                timeout=timeout,
-            ),
+        sandbox = cls._create_sync(
+            name=name,
+            image=image,
+            instance_type=instance_type,
+            ports=ports,
+            env=env,
+            regions=regions,
+            api_token=api_token,
+            timeout=timeout,
         )
 
         if wait_ready:
-            await sandbox.wait_ready(timeout=timeout)
+            sandbox.wait_ready(timeout=timeout)
 
         return sandbox
 
@@ -114,7 +110,10 @@ class Sandbox:
         api_token: Optional[str] = None,
         timeout: int = 300,
     ) -> "Sandbox":
-        """Synchronous creation method"""
+        """
+        Synchronous creation method that returns creation parameters.
+        Subclasses can override to return their own type.
+        """
         apps_api, services_api, _ = get_api_client(api_token)
 
         app_name = f"sandbox-app-{name}-{int(time.time())}"
@@ -169,7 +168,7 @@ class Sandbox:
                 f"No instances found in deployment after {max_wait} seconds"
             )
 
-        sandbox = cls(
+        return cls(
             sandbox_id=name,
             app_id=app_id,
             service_id=service_id,
@@ -177,6 +176,136 @@ class Sandbox:
             name=name,
             api_token=api_token,
         )
+
+    def wait_ready(self, timeout: int = 60, poll_interval: float = 2.0) -> bool:
+        """
+        Wait for sandbox to become ready with proper polling.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+            poll_interval: Time between health checks in seconds
+
+        Returns:
+            bool: True if sandbox became ready, False if timeout
+        """
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            is_healthy = is_sandbox_healthy(self.instance_id, self.api_token)
+
+            if is_healthy:
+                return True
+
+            time.sleep(poll_interval)
+
+        return False
+
+    def delete(self) -> None:
+        """Delete the sandbox instance."""
+        apps_api, services_api, _ = get_api_client(self.api_token)
+        services_api.delete_service(self.service_id)
+        apps_api.delete_app(self.app_id)
+
+    def status(self) -> str:
+        """Get current sandbox status"""
+        from .utils import get_sandbox_status
+
+        status = get_sandbox_status(self.instance_id, self.api_token)
+        return status.value
+
+    def is_healthy(self) -> bool:
+        """Check if sandbox is healthy and ready for operations"""
+        return is_sandbox_healthy(self.instance_id, self.api_token)
+
+    @property
+    def filesystem(self):
+        """Get filesystem operations interface"""
+        from .filesystem import SandboxFilesystem
+
+        return SandboxFilesystem(self)
+
+    @property
+    def exec(self):
+        """Get command execution interface"""
+        from .exec import SandboxExecutor
+
+        return SandboxExecutor(self)
+
+
+class AsyncSandbox(Sandbox):
+    """
+    Async sandbox for running code on Koyeb infrastructure.
+    Inherits from Sandbox and provides async wrappers for all operations.
+    """
+
+    @classmethod
+    async def create(
+        cls,
+        image: str = "docker.io/library/ubuntu:latest",
+        name: str = "quick-sandbox",
+        wait_ready: bool = True,
+        instance_type: str = "nano",
+        ports: Optional[List[DeploymentPort]] = None,
+        env: Optional[Dict[str, str]] = None,
+        regions: Optional[List[str]] = None,
+        api_token: Optional[str] = None,
+        timeout: int = 300,
+    ) -> "AsyncSandbox":
+        """
+            Create a new sandbox instance with async support.
+
+            Args:
+                image: Docker image to use (default: ubuntu:latest)
+                name: Name of the sandbox
+                wait_ready: Wait for sandbox to be ready (default: True)
+                instance_type: Instance type (default: nano)
+                ports: List of ports to expose
+                env: Environment variables
+                regions: List of regions to deploy to (default: ["na"])
+                api_token: Koyeb API token (if None, will try to get from KOYEB_API_TOKEN env var)
+                timeout: Timeout for sandbox creation in seconds
+
+        Returns:
+                AsyncSandbox: A new AsyncSandbox instance
+        """
+        if api_token is None:
+            import os
+
+            api_token = os.getenv("KOYEB_API_TOKEN")
+            if not api_token:
+                raise ValueError(
+                    "API token is required. Set KOYEB_API_TOKEN environment variable or pass api_token parameter"
+                )
+
+        loop = asyncio.get_running_loop()
+        sync_result = await loop.run_in_executor(
+            None,
+            lambda: Sandbox._create_sync(
+                name=name,
+                image=image,
+                instance_type=instance_type,
+                ports=ports,
+                env=env,
+                regions=regions,
+                api_token=api_token,
+                timeout=timeout,
+            ),
+        )
+
+        # Convert Sandbox instance to AsyncSandbox instance
+        sandbox = cls(
+            sandbox_id=sync_result.sandbox_id,
+            app_id=sync_result.app_id,
+            service_id=sync_result.service_id,
+            instance_id=sync_result.instance_id,
+            name=sync_result.name,
+            api_token=sync_result.api_token,
+        )
+        sandbox._created_at = sync_result._created_at
+
+        if wait_ready:
+            await sandbox.wait_ready(timeout=timeout)
+
         return sandbox
 
     async def wait_ready(self, timeout: int = 60, poll_interval: float = 2.0) -> bool:
@@ -195,7 +324,7 @@ class Sandbox:
         while time.time() - start_time < timeout:
             loop = asyncio.get_running_loop()
             is_healthy = await loop.run_in_executor(
-                None, is_sandbox_healthy, self.instance_id, self.api_token
+                None, super().is_healthy
             )
 
             if is_healthy:
@@ -208,41 +337,19 @@ class Sandbox:
     async def delete(self) -> None:
         """Delete the sandbox instance asynchronously."""
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._delete_sync)
-
-    def _delete_sync(self) -> None:
-        """Synchronous deletion method"""
-        apps_api, services_api, _ = get_api_client(self.api_token)
-        services_api.delete_service(self.service_id)
-        apps_api.delete_app(self.app_id)
+        await loop.run_in_executor(None, super().delete)
 
     async def status(self) -> str:
         """Get current sandbox status asynchronously"""
-        from .utils import get_sandbox_status
-
         loop = asyncio.get_running_loop()
-        status = await loop.run_in_executor(
-            None, get_sandbox_status, self.instance_id, self.api_token
+        status_value = await loop.run_in_executor(
+            None, super().status
         )
-        return status.value
+        return status_value
 
     async def is_healthy(self) -> bool:
         """Check if sandbox is healthy and ready for operations asynchronously"""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
-            None, is_sandbox_healthy, self.instance_id, self.api_token
+            None, super().is_healthy
         )
-
-    @property
-    def filesystem(self):
-        """Get filesystem operations interface"""
-        from .filesystem import SandboxFilesystem
-
-        return SandboxFilesystem(self)
-
-    @property
-    def exec(self):
-        """Get command execution interface"""
-        from .exec import SandboxExecutor
-
-        return SandboxExecutor(self)

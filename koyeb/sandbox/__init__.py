@@ -10,7 +10,7 @@ from koyeb.api.models.instance_status import InstanceStatus as SandboxStatus
 
 from .exec import CommandResult, CommandStatus, SandboxCommandError, SandboxExecutor
 from .filesystem import FileInfo, SandboxFilesystem
-from .sandbox import Sandbox
+from .sandbox import Sandbox, AsyncSandbox
 from .utils import SandboxError
 
 __all__ = [
@@ -23,4 +23,5 @@ __all__ = [
     "CommandResult",
     "CommandStatus",
     "SandboxCommandError",
+    "AsyncSandbox",
 ]
