@@ -16,6 +16,7 @@ from koyeb.api.models.create_app import CreateApp
 from koyeb.api.models.deployment_port import DeploymentPort
 
 from .utils import (
+    IdleTimeout,
     build_env_vars,
     create_deployment_definition,
     create_docker_source,
@@ -68,6 +69,7 @@ class Sandbox:
         regions: Optional[List[str]] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
+        idle_timeout: Optional[IdleTimeout] = None,
     ) -> Sandbox:
         """
             Create a new sandbox instance.
@@ -82,6 +84,11 @@ class Sandbox:
                 regions: List of regions to deploy to (default: ["na"])
                 api_token: Koyeb API token (if None, will try to get from KOYEB_API_TOKEN env var)
                 timeout: Timeout for sandbox creation in seconds
+                idle_timeout: Idle timeout configuration for scale-to-zero
+                    - None: Auto-enable (light_sleep=300s, deep_sleep=600s)
+                    - 0: Disable scale-to-zero (keep always-on)
+                    - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
+                    - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
 
         Returns:
                 Sandbox: A new Sandbox instance
@@ -102,6 +109,7 @@ class Sandbox:
             regions=regions,
             api_token=api_token,
             timeout=timeout,
+            idle_timeout=idle_timeout,
         )
 
         if wait_ready:
@@ -120,12 +128,13 @@ class Sandbox:
         regions: Optional[List[str]] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
+        idle_timeout: Optional[IdleTimeout] = None,
     ) -> Sandbox:
         """
         Synchronous creation method that returns creation parameters.
         Subclasses can override to return their own type.
         """
-        apps_api, services_api, _ = get_api_client(api_token)
+        apps_api, services_api, _, catalog_instances_api = get_api_client(api_token)
 
         # Auto-configure ports for koyeb/sandbox image if not explicitly provided
         if ports is None:
@@ -139,6 +148,13 @@ class Sandbox:
         if env is None:
             env = {}
         env["SANDBOX_SECRET"] = sandbox_secret
+
+        # Check if light sleep is enabled for this instance type
+        from .utils import _is_light_sleep_enabled
+
+        light_sleep_enabled = _is_light_sleep_enabled(
+            instance_type, catalog_instances_api
+        )
 
         app_name = f"sandbox-app-{name}-{int(time.time())}"
         app_response = apps_api.create_app(app=CreateApp(name=app_name))
@@ -154,6 +170,8 @@ class Sandbox:
             ports=ports,
             regions=regions,
             routes=routes,
+            idle_timeout=idle_timeout,
+            light_sleep_enabled=light_sleep_enabled,
         )
 
         from koyeb.api.models.create_service import CreateService
@@ -242,7 +260,7 @@ class Sandbox:
 
     def delete(self) -> None:
         """Delete the sandbox instance."""
-        apps_api, services_api, _ = get_api_client(self.api_token)
+        apps_api, services_api, _, _ = get_api_client(self.api_token)
         services_api.delete_service(self.service_id)
         apps_api.delete_app(self.app_id)
 
@@ -310,6 +328,7 @@ class AsyncSandbox(Sandbox):
         regions: Optional[List[str]] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
+        idle_timeout: Optional[IdleTimeout] = None,
     ) -> AsyncSandbox:
         """
             Create a new sandbox instance with async support.
@@ -324,6 +343,11 @@ class AsyncSandbox(Sandbox):
                 regions: List of regions to deploy to (default: ["na"])
                 api_token: Koyeb API token (if None, will try to get from KOYEB_API_TOKEN env var)
                 timeout: Timeout for sandbox creation in seconds
+                idle_timeout: Idle timeout configuration for scale-to-zero
+                    - None: Auto-enable (light_sleep=300s, deep_sleep=600s)
+                    - 0: Disable scale-to-zero (keep always-on)
+                    - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
+                    - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
 
         Returns:
                 AsyncSandbox: A new AsyncSandbox instance
@@ -347,6 +371,7 @@ class AsyncSandbox(Sandbox):
                 regions=regions,
                 api_token=api_token,
                 timeout=timeout,
+                idle_timeout=idle_timeout,
             ),
         )
 

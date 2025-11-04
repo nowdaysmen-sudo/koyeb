@@ -90,8 +90,6 @@ class SandboxClient:
         """
         response = requests.get(f"{self.base_url}/health")
         response.raise_for_status()
-        if response.status_code != 200:
-            return {"status": "unhealthy"}
         return response.json()
 
     def run(

@@ -5,10 +5,10 @@ Utility functions for Koyeb Sandbox
 """
 
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional, TypedDict, Union
 
 from koyeb.api import ApiClient, Configuration
-from koyeb.api.api import AppsApi, InstancesApi, ServicesApi
+from koyeb.api.api import AppsApi, CatalogInstancesApi, InstancesApi, ServicesApi
 from koyeb.api.exceptions import ApiException, NotFoundException
 from koyeb.api.models.deployment_definition import DeploymentDefinition
 from koyeb.api.models.deployment_definition_type import DeploymentDefinitionType
@@ -17,15 +17,36 @@ from koyeb.api.models.deployment_instance_type import DeploymentInstanceType
 from koyeb.api.models.deployment_port import DeploymentPort
 from koyeb.api.models.deployment_route import DeploymentRoute
 from koyeb.api.models.deployment_scaling import DeploymentScaling
+from koyeb.api.models.deployment_scaling_target import DeploymentScalingTarget
+from koyeb.api.models.deployment_scaling_target_sleep_idle_delay import (
+    DeploymentScalingTargetSleepIdleDelay,
+)
 from koyeb.api.models.docker_source import DockerSource
 from koyeb.api.models.instance_status import InstanceStatus
 
 from .executor_client import SandboxClient
 
+# Type definitions for idle timeout
+IdleTimeoutSeconds = int
+
+
+class IdleTimeoutConfig(TypedDict, total=False):
+    """Configuration for idle timeout with light and deep sleep."""
+
+    light_sleep: IdleTimeoutSeconds  # Optional, but if provided, deep_sleep is required
+    deep_sleep: IdleTimeoutSeconds  # Required
+
+
+IdleTimeout = Union[
+    Literal[0],  # Disable scale-to-zero
+    IdleTimeoutSeconds,  # Deep sleep only (standard and GPU instances)
+    IdleTimeoutConfig,  # Explicit light_sleep/deep_sleep configuration
+]
+
 
 def get_api_client(
     api_token: Optional[str] = None, host: Optional[str] = None
-) -> tuple[AppsApi, ServicesApi, InstancesApi]:
+) -> tuple[AppsApi, ServicesApi, InstancesApi, CatalogInstancesApi]:
     """
     Get configured API clients for Koyeb operations.
 
@@ -34,7 +55,7 @@ def get_api_client(
         host: Koyeb API host URL. If not provided, will try to get from KOYEB_API_HOST env var (defaults to https://app.koyeb.com)
 
     Returns:
-        Tuple of (AppsApi, ServicesApi, InstancesApi) instances
+        Tuple of (AppsApi, ServicesApi, InstancesApi, CatalogInstancesApi) instances
 
     Raises:
         ValueError: If API token is not provided
@@ -51,7 +72,12 @@ def get_api_client(
     configuration.api_key_prefix["Bearer"] = "Bearer"
 
     api_client = ApiClient(configuration)
-    return AppsApi(api_client), ServicesApi(api_client), InstancesApi(api_client)
+    return (
+        AppsApi(api_client),
+        ServicesApi(api_client),
+        InstancesApi(api_client),
+        CatalogInstancesApi(api_client),
+    )
 
 
 def build_env_vars(env: Optional[Dict[str, str]]) -> List[DeploymentEnv]:
@@ -129,6 +155,150 @@ def create_koyeb_sandbox_routes() -> List[DeploymentRoute]:
     ]
 
 
+def _validate_idle_timeout(idle_timeout: Optional[IdleTimeout]) -> None:
+    """
+    Validate idle_timeout parameter according to spec.
+
+    Raises:
+        ValueError: If validation fails
+    """
+    if idle_timeout is None:
+        return
+
+    if isinstance(idle_timeout, int):
+        if idle_timeout < 0:
+            raise ValueError("idle_timeout must be >= 0")
+        if idle_timeout > 0:
+            # Deep sleep only - valid
+            return
+        # idle_timeout == 0 means disable scale-to-zero - valid
+        return
+
+    if isinstance(idle_timeout, dict):
+        if "deep_sleep" not in idle_timeout:
+            raise ValueError(
+                "idle_timeout dict must contain 'deep_sleep' key (at minimum)"
+            )
+
+        deep_sleep = idle_timeout.get("deep_sleep")
+        if deep_sleep is None or not isinstance(deep_sleep, int) or deep_sleep <= 0:
+            raise ValueError("deep_sleep must be a positive integer")
+
+        if "light_sleep" in idle_timeout:
+            light_sleep = idle_timeout.get("light_sleep")
+            if (
+                light_sleep is None
+                or not isinstance(light_sleep, int)
+                or light_sleep <= 0
+            ):
+                raise ValueError("light_sleep must be a positive integer")
+
+            if deep_sleep < light_sleep:
+                raise ValueError(
+                    "deep_sleep must be >= light_sleep when both are provided"
+                )
+
+
+def _is_light_sleep_enabled(
+    instance_type: str,
+    catalog_instances_api: Optional[CatalogInstancesApi] = None,
+) -> bool:
+    """
+    Check if light sleep is enabled for the instance type using API or fallback.
+
+    Args:
+        instance_type: Instance type string
+        catalog_instances_api: Optional CatalogInstancesApi client (if None, will try to create one)
+
+    Returns:
+        True if light sleep is enabled, False otherwise (defaults to True if API call fails)
+    """
+    try:
+        if catalog_instances_api is None:
+            _, _, _, catalog_instances_api = get_api_client(None)
+        response = catalog_instances_api.get_catalog_instance(id=instance_type)
+        if response and response.instance:
+            return response.instance.light_sleep_enabled or False
+    except (ApiException, NotFoundException):
+        # If API call fails, default to True (assume light sleep is enabled)
+        pass
+    except Exception:
+        # Any other error, default to True (assume light sleep is enabled)
+        pass
+    # Default to True if we can't determine from API
+    return True
+
+
+def _process_idle_timeout(
+    idle_timeout: Optional[IdleTimeout],
+    light_sleep_enabled: bool = True,
+) -> Optional[DeploymentScalingTargetSleepIdleDelay]:
+    """
+    Process idle_timeout parameter and convert to DeploymentScalingTargetSleepIdleDelay.
+
+    According to spec:
+    - If unsupported instance type: idle_timeout is silently ignored (returns None)
+    - None (default): Auto-enable light_sleep=300s, deep_sleep=600s
+    - 0: Explicitly disable scale-to-zero (returns None)
+    - int > 0: Deep sleep only
+    - dict: Explicit configuration
+    - If light_sleep_enabled is False for the instance type, light_sleep is ignored
+
+    Args:
+        idle_timeout: Idle timeout configuration
+        light_sleep_enabled: Whether light sleep is enabled for the instance type (default: True)
+
+    Returns:
+        DeploymentScalingTargetSleepIdleDelay or None if disabled/ignored
+    """
+    # Validate the parameter
+    _validate_idle_timeout(idle_timeout)
+
+    # Process according to spec
+    if idle_timeout is None:
+        # Default: Auto-enable light_sleep=300s, deep_sleep=600s
+        # If light sleep is not enabled, only use deep_sleep
+        if not light_sleep_enabled:
+            return DeploymentScalingTargetSleepIdleDelay(
+                deep_sleep_value=600,
+            )
+        return DeploymentScalingTargetSleepIdleDelay(
+            light_sleep_value=300,
+            deep_sleep_value=600,
+        )
+
+    if isinstance(idle_timeout, int):
+        if idle_timeout == 0:
+            # Explicitly disable scale-to-zero
+            return None
+        # Deep sleep only
+        return DeploymentScalingTargetSleepIdleDelay(
+            deep_sleep_value=idle_timeout,
+        )
+
+    if isinstance(idle_timeout, dict):
+        deep_sleep = idle_timeout.get("deep_sleep")
+        light_sleep = idle_timeout.get("light_sleep")
+
+        # If light sleep is not enabled, ignore light_sleep if provided
+        if not light_sleep_enabled:
+            return DeploymentScalingTargetSleepIdleDelay(
+                deep_sleep_value=deep_sleep,
+            )
+
+        if light_sleep is not None:
+            # Both light_sleep and deep_sleep provided
+            return DeploymentScalingTargetSleepIdleDelay(
+                light_sleep_value=light_sleep,
+                deep_sleep_value=deep_sleep,
+            )
+        else:
+            # Deep sleep only
+            return DeploymentScalingTargetSleepIdleDelay(
+                deep_sleep_value=deep_sleep,
+            )
+
+
 def create_deployment_definition(
     name: str,
     docker_source: DockerSource,
@@ -137,6 +307,8 @@ def create_deployment_definition(
     ports: Optional[List[DeploymentPort]] = None,
     regions: List[str] = None,
     routes: Optional[List[DeploymentRoute]] = None,
+    idle_timeout: Optional[IdleTimeout] = None,
+    light_sleep_enabled: bool = True,
 ) -> DeploymentDefinition:
     """
     Create deployment definition for a sandbox service.
@@ -149,6 +321,8 @@ def create_deployment_definition(
         ports: List of ports (if provided, type becomes WEB, otherwise WORKER)
         regions: List of regions (defaults to North America)
         routes: List of routes for public access
+        idle_timeout: Idle timeout configuration (see IdleTimeout type)
+        light_sleep_enabled: Whether light sleep is enabled for the instance type (default: True)
 
     Returns:
         DeploymentDefinition object
@@ -160,6 +334,20 @@ def create_deployment_definition(
         DeploymentDefinitionType.WEB if ports else DeploymentDefinitionType.WORKER
     )
 
+    # Process idle_timeout
+    sleep_idle_delay = _process_idle_timeout(idle_timeout, light_sleep_enabled)
+
+    # Create scaling configuration
+    # If idle_timeout is 0, explicitly disable scale-to-zero (min=1, always-on)
+    # Otherwise (None, int > 0, or dict), enable scale-to-zero (min=0)
+    min_scale = 1 if idle_timeout == 0 else 0
+    targets = None
+    if sleep_idle_delay is not None:
+        scaling_target = DeploymentScalingTarget(sleep_idle_delay=sleep_idle_delay)
+        targets = [scaling_target]
+
+    scalings = [DeploymentScaling(min=min_scale, max=1, targets=targets)]
+
     return DeploymentDefinition(
         name=name,
         type=deployment_type,
@@ -168,7 +356,7 @@ def create_deployment_definition(
         ports=ports,
         routes=routes,
         instance_types=[DeploymentInstanceType(type=instance_type)],
-        scalings=[DeploymentScaling(min=1, max=1)],
+        scalings=scalings,
         regions=regions,
     )
 
@@ -178,7 +366,7 @@ def get_sandbox_status(
 ) -> InstanceStatus:
     """Get the current status of a sandbox instance."""
     try:
-        _, _, instances_api = get_api_client(api_token)
+        _, _, instances_api, _ = get_api_client(api_token)
         instance_response = instances_api.get_instance(instance_id)
         return instance_response.instance.status
     except (NotFoundException, ApiException, Exception):
@@ -193,7 +381,7 @@ def get_sandbox_url(service_id: str, api_token: Optional[str] = None) -> Optiona
     executor API is exposed on port 3030 which is mounted at /koyeb-sandbox/.
     """
     try:
-        _, services_api, _ = get_api_client(api_token)
+        _, services_api, _, _ = get_api_client(api_token)
         service_response = services_api.get_service(service_id)
 
         # Get the service app URL (this would be like: app-name-org.koyeb.app)
@@ -201,7 +389,7 @@ def get_sandbox_url(service_id: str, api_token: Optional[str] = None) -> Optiona
         service = service_response.service
 
         if service.app_id:
-            apps_api, _, _ = get_api_client(api_token)
+            apps_api, _, _, _ = get_api_client(api_token)
             app_response = apps_api.get_app(service.app_id)
             app = app_response.app
             if hasattr(app, "domains") and app.domains:
