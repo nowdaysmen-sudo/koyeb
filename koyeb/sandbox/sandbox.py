@@ -568,13 +568,13 @@ class Sandbox:
         client = SandboxClient(sandbox_url, self.sandbox_secret)
         try:
             response = client.start_process(cmd, cwd, env)
-            if not response.get("success", False):
-                error_msg = response.get("error", "Unknown error")
-                raise SandboxError(f"Failed to launch process: {error_msg}")
+            # Check for process ID - if it exists, the process was launched successfully
             process_id = response.get("id")
-            if not process_id:
-                raise SandboxError("Process launched but no process ID returned")
-            return process_id
+            if process_id:
+                return process_id
+            # If no ID, check for explicit error
+            error_msg = response.get("error", response.get("message", "Unknown error"))
+            raise SandboxError(f"Failed to launch process: {error_msg}")
         except Exception as e:
             if isinstance(e, SandboxError):
                 raise
