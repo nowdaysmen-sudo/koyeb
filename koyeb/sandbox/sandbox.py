@@ -360,3 +360,11 @@ class AsyncSandbox(Sandbox):
         from .exec import AsyncSandboxExecutor
 
         return AsyncSandboxExecutor(self)
+
+    @property
+    def filesystem(self):
+        """Get filesystem operations interface"""
+        from .filesystem import AsyncSandboxFilesystem
+
+        return AsyncSandboxFilesystem(self)
+
