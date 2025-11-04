@@ -15,6 +15,7 @@ from koyeb.api.models.deployment_definition_type import DeploymentDefinitionType
 from koyeb.api.models.deployment_env import DeploymentEnv
 from koyeb.api.models.deployment_instance_type import DeploymentInstanceType
 from koyeb.api.models.deployment_port import DeploymentPort
+from koyeb.api.models.deployment_proxy_port import DeploymentProxyPort
 from koyeb.api.models.deployment_route import DeploymentRoute
 from koyeb.api.models.deployment_scaling import DeploymentScaling
 from koyeb.api.models.deployment_scaling_target import DeploymentScalingTarget
@@ -23,6 +24,7 @@ from koyeb.api.models.deployment_scaling_target_sleep_idle_delay import (
 )
 from koyeb.api.models.docker_source import DockerSource
 from koyeb.api.models.instance_status import InstanceStatus
+from koyeb.api.models.proxy_port_protocol import ProxyPortProtocol
 
 from .executor_client import SandboxClient
 
@@ -172,6 +174,24 @@ def create_koyeb_sandbox_ports(protocol: str = "http") -> List[DeploymentPort]:
         DeploymentPort(
             port=3031,
             protocol=protocol,
+        ),
+    ]
+
+
+def create_koyeb_sandbox_proxy_ports() -> List[DeploymentProxyPort]:
+    """
+    Create TCP proxy port configuration for koyeb/sandbox image.
+
+    Creates proxy port for direct TCP access:
+    - Port 3031 exposed via TCP proxy
+
+    Returns:
+        List of DeploymentProxyPort objects configured for TCP proxy access
+    """
+    return [
+        DeploymentProxyPort(
+            port=3031,
+            protocol=ProxyPortProtocol.TCP,
         ),
     ]
 
@@ -347,6 +367,7 @@ def create_deployment_definition(
     routes: Optional[List[DeploymentRoute]] = None,
     idle_timeout: Optional[IdleTimeout] = None,
     light_sleep_enabled: bool = True,
+    enable_tcp_proxy: bool = False,
 ) -> DeploymentDefinition:
     """
     Create deployment definition for a sandbox service.
@@ -363,6 +384,7 @@ def create_deployment_definition(
         routes: List of routes for public access
         idle_timeout: Idle timeout configuration (see IdleTimeout type)
         light_sleep_enabled: Whether light sleep is enabled for the instance type (default: True)
+        enable_tcp_proxy: If True, enables TCP proxy for direct TCP access to port 3031
 
     Returns:
         DeploymentDefinition object
@@ -375,6 +397,11 @@ def create_deployment_definition(
     # Validate protocol using API model structure
     protocol = _validate_port_protocol(protocol)
     ports = create_koyeb_sandbox_ports(protocol)
+
+    # Create TCP proxy ports if enabled
+    proxy_ports = None
+    if enable_tcp_proxy:
+        proxy_ports = create_koyeb_sandbox_proxy_ports()
 
     # Always use WEB type
     deployment_type = DeploymentDefinitionType.WEB
@@ -399,6 +426,7 @@ def create_deployment_definition(
         docker=docker_source,
         env=env_vars,
         ports=ports,
+        proxy_ports=proxy_ports,
         routes=routes,
         instance_types=[DeploymentInstanceType(type=instance_type)],
         scalings=scalings,
@@ -416,38 +444,6 @@ def get_sandbox_status(
         return instance_response.instance.status
     except (NotFoundException, ApiException, Exception):
         return InstanceStatus.ERROR
-
-
-def _get_sandbox_domain(
-    service_id: str, api_token: Optional[str] = None
-) -> Optional[str]:
-    """
-    Internal function to get the public domain of a sandbox service.
-
-    Returns the domain name (e.g., "app-name-org.koyeb.app") without protocol or path.
-
-    Args:
-        service_id: The service ID
-        api_token: Optional API token (if None, will try to get from KOYEB_API_TOKEN env var)
-
-    Returns:
-        Optional[str]: The domain name or None if unavailable
-    """
-    try:
-        _, services_api, _, _ = get_api_client(api_token)
-        service_response = services_api.get_service(service_id)
-        service = service_response.service
-
-        if service.app_id:
-            apps_api, _, _, _ = get_api_client(api_token)
-            app_response = apps_api.get_app(service.app_id)
-            app = app_response.app
-            if hasattr(app, "domains") and app.domains:
-                # Use the first public domain
-                return app.domains[0].name
-        return None
-    except (NotFoundException, ApiException, Exception):
-        return None
 
 
 def is_sandbox_healthy(

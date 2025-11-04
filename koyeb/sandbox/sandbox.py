@@ -68,6 +68,7 @@ class Sandbox:
         api_token: Optional[str] = None,
         timeout: int = 300,
         idle_timeout: Optional[IdleTimeout] = None,
+        enable_tcp_proxy: bool = False,
     ) -> Sandbox:
         """
             Create a new sandbox instance.
@@ -89,6 +90,7 @@ class Sandbox:
                     - 0: Disable scale-to-zero (keep always-on)
                     - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
                     - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
+                enable_tcp_proxy: If True, enables TCP proxy for direct TCP access to port 3031
 
         Returns:
                 Sandbox: A new Sandbox instance
@@ -110,6 +112,7 @@ class Sandbox:
             api_token=api_token,
             timeout=timeout,
             idle_timeout=idle_timeout,
+            enable_tcp_proxy=enable_tcp_proxy,
         )
 
         if wait_ready:
@@ -129,6 +132,7 @@ class Sandbox:
         api_token: Optional[str] = None,
         timeout: int = 300,
         idle_timeout: Optional[IdleTimeout] = None,
+        enable_tcp_proxy: bool = False,
     ) -> Sandbox:
         """
         Synchronous creation method that returns creation parameters.
@@ -170,6 +174,7 @@ class Sandbox:
             routes=routes,
             idle_timeout=idle_timeout,
             light_sleep_enabled=light_sleep_enabled,
+            enable_tcp_proxy=enable_tcp_proxy,
         )
 
         from koyeb.api.models.create_service import CreateService
@@ -256,6 +261,34 @@ class Sandbox:
 
         return False
 
+    def wait_tcp_proxy_ready(
+        self, timeout: int = 60, poll_interval: float = 2.0
+    ) -> bool:
+        """
+        Wait for TCP proxy to become ready and available.
+
+        Polls the deployment metadata until the TCP proxy information is available.
+        This is useful when enable_tcp_proxy=True was set during sandbox creation,
+        as the proxy information may not be immediately available.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+            poll_interval: Time between checks in seconds
+
+        Returns:
+            bool: True if TCP proxy became ready, False if timeout
+        """
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            tcp_proxy_info = self.get_tcp_proxy_info()
+            if tcp_proxy_info is not None:
+                return True
+
+            time.sleep(poll_interval)
+
+        return False
+
     def delete(self) -> None:
         """Delete the sandbox instance."""
         apps_api, services_api, _, _ = get_api_client(self.api_token)
@@ -272,9 +305,73 @@ class Sandbox:
         Returns:
             Optional[str]: The domain name or None if unavailable
         """
-        from .utils import _get_sandbox_domain
+        try:
+            from koyeb.api.exceptions import ApiException, NotFoundException
 
-        return _get_sandbox_domain(self.service_id, self.api_token)
+            from .utils import get_api_client
+
+            _, services_api, _, _ = get_api_client(self.api_token)
+            service_response = services_api.get_service(self.service_id)
+            service = service_response.service
+
+            if service.app_id:
+                apps_api, _, _, _ = get_api_client(self.api_token)
+                app_response = apps_api.get_app(service.app_id)
+                app = app_response.app
+                if hasattr(app, "domains") and app.domains:
+                    # Use the first public domain
+                    return app.domains[0].name
+            return None
+        except (NotFoundException, ApiException, Exception):
+            return None
+
+    def get_tcp_proxy_info(self) -> Optional[tuple[str, int]]:
+        """
+        Get the TCP proxy host and port for the sandbox.
+
+        Returns the TCP proxy host and port as a tuple (host, port) for direct TCP access to port 3031.
+        This is only available if enable_tcp_proxy=True was set when creating the sandbox.
+
+        Returns:
+            Optional[tuple[str, int]]: A tuple of (host, port) or None if unavailable
+        """
+        try:
+            from koyeb.api.exceptions import ApiException, NotFoundException
+
+            from .utils import get_api_client
+
+            _, services_api, _, _ = get_api_client(self.api_token)
+            service_response = services_api.get_service(self.service_id)
+            service = service_response.service
+
+            if not service.active_deployment_id:
+                return None
+
+            # Get the active deployment
+            from koyeb.api.api.deployments_api import DeploymentsApi
+
+            deployments_api = DeploymentsApi()
+            deployments_api.api_client = services_api.api_client
+            deployment_response = deployments_api.get_deployment(
+                service.active_deployment_id
+            )
+            deployment = deployment_response.deployment
+
+            if not deployment.metadata or not deployment.metadata.proxy_ports:
+                return None
+
+            # Find the proxy port for port 3031
+            for proxy_port in deployment.metadata.proxy_ports:
+                if (
+                    proxy_port.port == 3031
+                    and proxy_port.host
+                    and proxy_port.public_port
+                ):
+                    return (proxy_port.host, proxy_port.public_port)
+
+            return None
+        except (NotFoundException, ApiException, Exception):
+            return None
 
     def _get_sandbox_url(self) -> Optional[str]:
         """
@@ -341,6 +438,7 @@ class AsyncSandbox(Sandbox):
         api_token: Optional[str] = None,
         timeout: int = 300,
         idle_timeout: Optional[IdleTimeout] = None,
+        enable_tcp_proxy: bool = False,
     ) -> AsyncSandbox:
         """
             Create a new sandbox instance with async support.
@@ -362,6 +460,7 @@ class AsyncSandbox(Sandbox):
                     - 0: Disable scale-to-zero (keep always-on)
                     - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
                     - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
+                enable_tcp_proxy: If True, enables TCP proxy for direct TCP access to port 3031
 
         Returns:
                 AsyncSandbox: A new AsyncSandbox instance
@@ -386,6 +485,7 @@ class AsyncSandbox(Sandbox):
                 api_token=api_token,
                 timeout=timeout,
                 idle_timeout=idle_timeout,
+                enable_tcp_proxy=enable_tcp_proxy,
             ),
         )
 
@@ -424,6 +524,37 @@ class AsyncSandbox(Sandbox):
             is_healthy = await loop.run_in_executor(None, super().is_healthy)
 
             if is_healthy:
+                return True
+
+            await asyncio.sleep(poll_interval)
+
+        return False
+
+    async def wait_tcp_proxy_ready(
+        self, timeout: int = 60, poll_interval: float = 2.0
+    ) -> bool:
+        """
+        Wait for TCP proxy to become ready and available asynchronously.
+
+        Polls the deployment metadata until the TCP proxy information is available.
+        This is useful when enable_tcp_proxy=True was set during sandbox creation,
+        as the proxy information may not be immediately available.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+            poll_interval: Time between checks in seconds
+
+        Returns:
+            bool: True if TCP proxy became ready, False if timeout
+        """
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            loop = asyncio.get_running_loop()
+            tcp_proxy_info = await loop.run_in_executor(
+                None, super().get_tcp_proxy_info
+            )
+            if tcp_proxy_info is not None:
                 return True
 
             await asyncio.sleep(poll_interval)
