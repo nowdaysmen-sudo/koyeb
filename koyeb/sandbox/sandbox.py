@@ -11,7 +11,7 @@ import os
 import secrets
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from koyeb.api.models.create_app import CreateApp
 
@@ -533,6 +533,164 @@ class Sandbox:
                 raise
             raise SandboxError(f"Failed to unexpose port: {str(e)}") from e
 
+    def launch_process(
+        self, cmd: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None
+    ) -> str:
+        """
+        Launch a background process in the sandbox.
+
+        Starts a long-running background process that continues executing even after
+        the method returns. Use this for servers, workers, or other long-running tasks.
+
+        Args:
+            cmd: The shell command to execute as a background process
+            cwd: Optional working directory for the process
+            env: Optional environment variables to set/override for the process
+
+        Returns:
+            str: The unique process ID (UUID string) that can be used to manage the process
+
+        Raises:
+            SandboxError: If the process launch fails
+
+        Example:
+            >>> process_id = sandbox.launch_process("python -u server.py")
+            >>> print(f"Started process: {process_id}")
+        """
+        from .executor_client import SandboxClient
+
+        sandbox_url = self._get_sandbox_url()
+        if not sandbox_url:
+            raise SandboxError("Unable to get sandbox URL")
+        if not self.sandbox_secret:
+            raise SandboxError("Sandbox secret not available")
+
+        client = SandboxClient(sandbox_url, self.sandbox_secret)
+        try:
+            response = client.start_process(cmd, cwd, env)
+            if not response.get("success", False):
+                error_msg = response.get("error", "Unknown error")
+                raise SandboxError(f"Failed to launch process: {error_msg}")
+            process_id = response.get("id")
+            if not process_id:
+                raise SandboxError("Process launched but no process ID returned")
+            return process_id
+        except Exception as e:
+            if isinstance(e, SandboxError):
+                raise
+            raise SandboxError(f"Failed to launch process: {str(e)}") from e
+
+    def kill_process(self, process_id: str) -> None:
+        """
+        Kill a background process by its ID.
+
+        Terminates a running background process. This sends a SIGTERM signal to the process,
+        allowing it to clean up gracefully. If the process doesn't terminate within a timeout,
+        it will be forcefully killed with SIGKILL.
+
+        Args:
+            process_id: The unique process ID (UUID string) to kill
+
+        Raises:
+            SandboxError: If the process kill operation fails
+
+        Example:
+            >>> sandbox.kill_process("550e8400-e29b-41d4-a716-446655440000")
+        """
+        from .executor_client import SandboxClient
+
+        sandbox_url = self._get_sandbox_url()
+        if not sandbox_url:
+            raise SandboxError("Unable to get sandbox URL")
+        if not self.sandbox_secret:
+            raise SandboxError("Sandbox secret not available")
+
+        client = SandboxClient(sandbox_url, self.sandbox_secret)
+        try:
+            response = client.kill_process(process_id)
+            if not response.get("success", False):
+                error_msg = response.get("error", "Unknown error")
+                raise SandboxError(f"Failed to kill process {process_id}: {error_msg}")
+        except Exception as e:
+            if isinstance(e, SandboxError):
+                raise
+            raise SandboxError(f"Failed to kill process {process_id}: {str(e)}") from e
+
+    def list_processes(self) -> List[Dict[str, Any]]:
+        """
+        List all background processes.
+
+        Returns information about all currently running and recently completed background
+        processes. This includes both active processes and processes that have completed
+        (which remain in memory until server restart).
+
+        Returns:
+            List[Dict[str, Any]]: List of process dictionaries, each containing:
+                - id: Process ID (UUID string)
+                - cmd: The command that was executed
+                - status: Process status (e.g., "running", "completed")
+                - pid: OS process ID (if running)
+                - exit_code: Exit code (if completed)
+                - started_at: ISO 8601 timestamp when process started
+                - completed_at: ISO 8601 timestamp when process completed (if applicable)
+
+        Raises:
+            SandboxError: If listing processes fails
+
+        Example:
+            >>> processes = sandbox.list_processes()
+            >>> for process in processes:
+            ...     print(f"{process['id']}: {process['cmd']} - {process['status']}")
+        """
+        from .executor_client import SandboxClient
+
+        sandbox_url = self._get_sandbox_url()
+        if not sandbox_url:
+            raise SandboxError("Unable to get sandbox URL")
+        if not self.sandbox_secret:
+            raise SandboxError("Sandbox secret not available")
+
+        client = SandboxClient(sandbox_url, self.sandbox_secret)
+        try:
+            response = client.list_processes()
+            return response.get("processes", [])
+        except Exception as e:
+            if isinstance(e, SandboxError):
+                raise
+            raise SandboxError(f"Failed to list processes: {str(e)}") from e
+
+    def kill_all_processes(self) -> int:
+        """
+        Kill all running background processes.
+
+        Convenience method that lists all processes and kills them all. This is useful
+        for cleanup operations.
+
+        Returns:
+            int: The number of processes that were killed
+
+        Raises:
+            SandboxError: If listing or killing processes fails
+
+        Example:
+            >>> count = sandbox.kill_all_processes()
+            >>> print(f"Killed {count} processes")
+        """
+        processes = self.list_processes()
+        killed_count = 0
+        for process in processes:
+            process_id = process.get("id")
+            status = process.get("status", "")
+            # Only kill running processes
+            if process_id and status == "running":
+                try:
+                    self.kill_process(process_id)
+                    killed_count += 1
+                except SandboxError:
+                    # Continue killing other processes even if one fails
+                    pass
+        return killed_count
+
 
 class AsyncSandbox(Sandbox):
     """
@@ -719,3 +877,33 @@ class AsyncSandbox(Sandbox):
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, super().unexpose_port)
+
+    async def launch_process(
+        self, cmd: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None
+    ) -> str:
+        """Launch a background process in the sandbox asynchronously."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, super().launch_process, cmd, cwd, env)
+
+    async def kill_process(self, process_id: str) -> None:
+        """Kill a background process by its ID asynchronously."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, super().kill_process, process_id)
+
+    async def list_processes(self) -> List[Dict[str, Any]]:
+        """List all background processes asynchronously."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, super().list_processes)
+
+    async def kill_all_processes(self) -> int:
+        """Kill all running background processes asynchronously."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, super().kill_all_processes)

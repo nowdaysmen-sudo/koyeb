@@ -325,3 +325,95 @@ class SandboxClient:
             "POST", f"{self.base_url}/unbind_port", json=payload, headers=self.headers
         )
         return response.json()
+
+    def start_process(
+        self, cmd: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Start a background process in the sandbox.
+
+        Starts a long-running background process that continues executing even after
+        the API call completes. Use this for servers, workers, or other long-running tasks.
+
+        Args:
+            cmd: The shell command to execute as a background process
+            cwd: Optional working directory for the process
+            env: Optional environment variables to set/override for the process
+
+        Returns:
+            Dict with process id and success status:
+                - id: The unique process ID (UUID string)
+                - success: True if the process was started successfully
+
+        Example:
+            >>> client = SandboxClient("http://localhost:8080", "secret")
+            >>> result = client.start_process("python -u server.py")
+            >>> process_id = result["id"]
+            >>> print(f"Started process: {process_id}")
+        """
+        payload = {"cmd": cmd}
+        if cwd is not None:
+            payload["cwd"] = cwd
+        if env is not None:
+            payload["env"] = env
+
+        response = self._request_with_retry(
+            "POST", f"{self.base_url}/start_process", json=payload, headers=self.headers
+        )
+        return response.json()
+
+    def kill_process(self, process_id: str) -> Dict[str, Any]:
+        """
+        Kill a background process by its ID.
+
+        Terminates a running background process. This sends a SIGTERM signal to the process,
+        allowing it to clean up gracefully. If the process doesn't terminate within a timeout,
+        it will be forcefully killed with SIGKILL.
+
+        Args:
+            process_id: The unique process ID (UUID string) to kill
+
+        Returns:
+            Dict with success status and error message if any
+
+        Example:
+            >>> client = SandboxClient("http://localhost:8080", "secret")
+            >>> result = client.kill_process("550e8400-e29b-41d4-a716-446655440000")
+            >>> if result.get("success"):
+            ...     print("Process killed successfully")
+        """
+        payload = {"id": process_id}
+        response = self._request_with_retry(
+            "POST", f"{self.base_url}/kill_process", json=payload, headers=self.headers
+        )
+        return response.json()
+
+    def list_processes(self) -> Dict[str, Any]:
+        """
+        List all background processes.
+
+        Returns information about all currently running and recently completed background
+        processes. This includes both active processes and processes that have completed
+        (which remain in memory until server restart).
+
+        Returns:
+            Dict with a list of processes:
+                - processes: List of process objects, each containing:
+                    - id: Process ID (UUID string)
+                    - cmd: The command that was executed
+                    - status: Process status (e.g., "running", "completed")
+                    - pid: OS process ID (if running)
+                    - exit_code: Exit code (if completed)
+                    - started_at: ISO 8601 timestamp when process started
+                    - completed_at: ISO 8601 timestamp when process completed (if applicable)
+
+        Example:
+            >>> client = SandboxClient("http://localhost:8080", "secret")
+            >>> result = client.list_processes()
+            >>> for process in result.get("processes", []):
+            ...     print(f"{process['id']}: {process['cmd']} - {process['status']}")
+        """
+        response = self._request_with_retry(
+            "GET", f"{self.base_url}/list_processes", headers=self.headers
+        )
+        return response.json()
