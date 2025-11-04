@@ -4,6 +4,7 @@ Sandbox Executor API Client
 A simple Python client for interacting with the Sandbox Executor API.
 """
 
+import json
 import time
 from typing import Any, Dict, Iterator, Optional
 
@@ -153,8 +154,6 @@ class SandboxClient:
             ...     elif "code" in event:
             ...         print(f"Exit code: {event['code']}")
         """
-        import json
-
         payload = {"cmd": cmd}
         if cwd is not None:
             payload["cwd"] = cwd

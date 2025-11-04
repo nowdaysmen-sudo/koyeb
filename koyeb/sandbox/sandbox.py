@@ -4,10 +4,13 @@
 Koyeb Sandbox - Python SDK for creating and managing Koyeb sandboxes
 """
 
+from __future__ import annotations
+
 import asyncio
+import os
 import secrets
 import time
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from koyeb.api.models.create_app import CreateApp
 from koyeb.api.models.deployment_port import DeploymentPort
@@ -21,6 +24,10 @@ from .utils import (
     get_api_client,
     is_sandbox_healthy,
 )
+
+if TYPE_CHECKING:
+    from .exec import AsyncSandboxExecutor, SandboxExecutor
+    from .filesystem import AsyncSandboxFilesystem, SandboxFilesystem
 
 
 class Sandbox:
@@ -61,7 +68,7 @@ class Sandbox:
         regions: Optional[List[str]] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
-    ) -> "Sandbox":
+    ) -> Sandbox:
         """
             Create a new sandbox instance.
 
@@ -80,8 +87,6 @@ class Sandbox:
                 Sandbox: A new Sandbox instance
         """
         if api_token is None:
-            import os
-
             api_token = os.getenv("KOYEB_API_TOKEN")
             if not api_token:
                 raise ValueError(
@@ -115,7 +120,7 @@ class Sandbox:
         regions: Optional[List[str]] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
-    ) -> "Sandbox":
+    ) -> Sandbox:
         """
         Synchronous creation method that returns creation parameters.
         Subclasses can override to return their own type.
@@ -273,14 +278,14 @@ class Sandbox:
         )
 
     @property
-    def filesystem(self):
+    def filesystem(self) -> SandboxFilesystem:
         """Get filesystem operations interface"""
         from .filesystem import SandboxFilesystem
 
         return SandboxFilesystem(self)
 
     @property
-    def exec(self):
+    def exec(self) -> SandboxExecutor:
         """Get command execution interface"""
         from .exec import SandboxExecutor
 
@@ -305,7 +310,7 @@ class AsyncSandbox(Sandbox):
         regions: Optional[List[str]] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
-    ) -> "AsyncSandbox":
+    ) -> AsyncSandbox:
         """
             Create a new sandbox instance with async support.
 
@@ -324,8 +329,6 @@ class AsyncSandbox(Sandbox):
                 AsyncSandbox: A new AsyncSandbox instance
         """
         if api_token is None:
-            import os
-
             api_token = os.getenv("KOYEB_API_TOKEN")
             if not api_token:
                 raise ValueError(
@@ -405,14 +408,14 @@ class AsyncSandbox(Sandbox):
         return await loop.run_in_executor(None, super().is_healthy)
 
     @property
-    def exec(self):
+    def exec(self) -> AsyncSandboxExecutor:
         """Get async command execution interface"""
         from .exec import AsyncSandboxExecutor
 
         return AsyncSandboxExecutor(self)
 
     @property
-    def filesystem(self):
+    def filesystem(self) -> AsyncSandboxFilesystem:
         """Get filesystem operations interface"""
         from .filesystem import AsyncSandboxFilesystem
 

@@ -5,14 +5,19 @@ Command execution utilities for Koyeb Sandbox instances
 Using SandboxClient HTTP API
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from .executor_client import SandboxClient
 from .utils import SandboxError
+
+if TYPE_CHECKING:
+    from .sandbox import Sandbox
 
 
 class CommandStatus(str, Enum):
@@ -62,7 +67,7 @@ class SandboxExecutor:
     For async usage, use AsyncSandboxExecutor instead.
     """
 
-    def __init__(self, sandbox):
+    def __init__(self, sandbox: Sandbox) -> None:
         self.sandbox = sandbox
         self._client = None
 

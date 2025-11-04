@@ -5,13 +5,19 @@ Filesystem operations for Koyeb Sandbox instances
 Using SandboxClient HTTP API
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import TYPE_CHECKING, Dict, List, Union
 
 from .executor_client import SandboxClient
 from .utils import SandboxError
+
+if TYPE_CHECKING:
+    from .exec import SandboxExecutor
+    from .sandbox import Sandbox
 
 
 class SandboxFilesystemError(SandboxError):
@@ -42,7 +48,7 @@ class SandboxFilesystem:
     For async usage, use AsyncSandboxFilesystem instead.
     """
 
-    def __init__(self, sandbox):
+    def __init__(self, sandbox: Sandbox) -> None:
         self.sandbox = sandbox
         self._client = None
         self._executor = None
@@ -58,7 +64,7 @@ class SandboxFilesystem:
             self._client = SandboxClient(sandbox_url, self.sandbox.sandbox_secret)
         return self._client
 
-    def _get_executor(self):
+    def _get_executor(self) -> SandboxExecutor:
         """Get or create SandboxExecutor instance"""
         if self._executor is None:
             from .exec import SandboxExecutor
@@ -315,7 +321,7 @@ class SandboxFilesystem:
                 raise FileNotFoundError(f"File not found: {path}")
             raise SandboxFilesystemError(f"Failed to remove: {result.stderr}")
 
-    def open(self, path: str, mode: str = "r") -> "SandboxFileIO":
+    def open(self, path: str, mode: str = "r") -> SandboxFileIO:
         """
         Open a file in the sandbox synchronously.
 
@@ -543,7 +549,7 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             None, lambda: super(AsyncSandboxFilesystem, self).rm(path, recursive)
         )
 
-    def open(self, path: str, mode: str = "r") -> "AsyncSandboxFileIO":
+    def open(self, path: str, mode: str = "r") -> AsyncSandboxFileIO:
         """
         Open a file in the sandbox asynchronously.
 
