@@ -115,6 +115,59 @@ class SandboxExecutor:
         """
         start_time = time.time()
         
+        # Use streaming if callbacks are provided
+        if on_stdout or on_stderr:
+            stdout_buffer = []
+            stderr_buffer = []
+            exit_code = 0
+            
+            try:
+                client = self._get_client()
+                for event in client.run_streaming(cmd=command, cwd=cwd, env=env):
+                    if "stream" in event:
+                        stream_type = event["stream"]
+                        data = event["data"]
+                        
+                        if stream_type == "stdout":
+                            stdout_buffer.append(data)
+                            if on_stdout:
+                                on_stdout(data)
+                        elif stream_type == "stderr":
+                            stderr_buffer.append(data)
+                            if on_stderr:
+                                on_stderr(data)
+                    elif "code" in event:
+                        exit_code = event["code"]
+                    elif "error" in event and isinstance(event["error"], str):
+                        # Error starting command
+                        return CommandResult(
+                            stdout="",
+                            stderr=event["error"],
+                            exit_code=1,
+                            status=CommandStatus.FAILED,
+                            duration=time.time() - start_time,
+                            command=command,
+                        )
+                
+                return CommandResult(
+                    stdout="".join(stdout_buffer),
+                    stderr="".join(stderr_buffer),
+                    exit_code=exit_code,
+                    status=CommandStatus.FINISHED if exit_code == 0 else CommandStatus.FAILED,
+                    duration=time.time() - start_time,
+                    command=command,
+                )
+            except Exception as e:
+                return CommandResult(
+                    stdout="",
+                    stderr=f"Command execution failed: {str(e)}",
+                    exit_code=1,
+                    status=CommandStatus.FAILED,
+                    duration=time.time() - start_time,
+                    command=command,
+                )
+        
+        # Use regular run for non-streaming execution
         try:
             client = self._get_client()
             response = client.run(cmd=command, cwd=cwd, env=env)
@@ -122,12 +175,6 @@ class SandboxExecutor:
             stdout = response.get('stdout', '')
             stderr = response.get('stderr', '')
             exit_code = response.get('exit_code', 0)
-            
-            # Call callbacks if provided
-            if on_stdout and stdout:
-                on_stdout(stdout)
-            if on_stderr and stderr:
-                on_stderr(stderr)
             
             return CommandResult(
                 stdout=stdout,
@@ -194,6 +241,69 @@ class AsyncSandboxExecutor(SandboxExecutor):
         """
         start_time = time.time()
         
+        # Use streaming if callbacks are provided
+        if on_stdout or on_stderr:
+            stdout_buffer = []
+            stderr_buffer = []
+            exit_code = 0
+            
+            try:
+                client = self._get_client()
+                # Run streaming in executor to avoid blocking
+                loop = asyncio.get_running_loop()
+                
+                def stream_command():
+                    events = []
+                    for event in client.run_streaming(cmd=command, cwd=cwd, env=env):
+                        events.append(event)
+                    return events
+                
+                events = await loop.run_in_executor(None, stream_command)
+                
+                for event in events:
+                    if "stream" in event:
+                        stream_type = event["stream"]
+                        data = event["data"]
+                        
+                        if stream_type == "stdout":
+                            stdout_buffer.append(data)
+                            if on_stdout:
+                                on_stdout(data)
+                        elif stream_type == "stderr":
+                            stderr_buffer.append(data)
+                            if on_stderr:
+                                on_stderr(data)
+                    elif "code" in event:
+                        exit_code = event["code"]
+                    elif "error" in event and isinstance(event["error"], str):
+                        # Error starting command
+                        return CommandResult(
+                            stdout="",
+                            stderr=event["error"],
+                            exit_code=1,
+                            status=CommandStatus.FAILED,
+                            duration=time.time() - start_time,
+                            command=command,
+                        )
+                
+                return CommandResult(
+                    stdout="".join(stdout_buffer),
+                    stderr="".join(stderr_buffer),
+                    exit_code=exit_code,
+                    status=CommandStatus.FINISHED if exit_code == 0 else CommandStatus.FAILED,
+                    duration=time.time() - start_time,
+                    command=command,
+                )
+            except Exception as e:
+                return CommandResult(
+                    stdout="",
+                    stderr=f"Command execution failed: {str(e)}",
+                    exit_code=1,
+                    status=CommandStatus.FAILED,
+                    duration=time.time() - start_time,
+                    command=command,
+                )
+        
         # Run in executor to avoid blocking
         loop = asyncio.get_running_loop()
         
@@ -207,12 +317,6 @@ class AsyncSandboxExecutor(SandboxExecutor):
             stdout = response.get('stdout', '')
             stderr = response.get('stderr', '')
             exit_code = response.get('exit_code', 0)
-            
-            # Call callbacks if provided
-            if on_stdout and stdout:
-                on_stdout(stdout)
-            if on_stderr and stderr:
-                on_stderr(stderr)
             
             return CommandResult(
                 stdout=stdout,
