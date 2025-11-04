@@ -10,12 +10,14 @@ import asyncio
 import os
 import secrets
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from koyeb.api.models.create_app import CreateApp
 
 from .utils import (
     IdleTimeout,
+    SandboxError,
     build_env_vars,
     create_deployment_definition,
     create_docker_source,
@@ -27,6 +29,17 @@ from .utils import (
 if TYPE_CHECKING:
     from .exec import AsyncSandboxExecutor, SandboxExecutor
     from .filesystem import AsyncSandboxFilesystem, SandboxFilesystem
+
+
+@dataclass
+class ExposedPort:
+    """Result of exposing a port via TCP proxy."""
+
+    port: int
+    exposed_at: str
+
+    def __str__(self) -> str:
+        return f"ExposedPort(port={self.port}, exposed_at='{self.exposed_at}')"
 
 
 class Sandbox:
@@ -418,6 +431,108 @@ class Sandbox:
 
         return SandboxExecutor(self)
 
+    def expose_port(self, port: int) -> ExposedPort:
+        """
+        Expose a port to external connections via TCP proxy.
+
+        Binds the specified internal port to the TCP proxy, allowing external
+        connections to reach services running on that port inside the sandbox.
+        Automatically unbinds any existing port before binding the new one.
+
+        Args:
+            port: The internal port number to expose (must be a valid port number)
+
+        Returns:
+            ExposedPort: An object with `port` and `exposed_at` attributes:
+                - port: The exposed port number
+                - exposed_at: The full URL with https:// protocol (e.g., "https://app-name-org.koyeb.app")
+
+        Raises:
+            SandboxError: If the port binding operation fails
+
+        Notes:
+            - Only one port can be exposed at a time
+            - Any existing port binding is automatically unbound before binding the new port
+            - The port must be available and accessible within the sandbox environment
+            - The TCP proxy is accessed via get_tcp_proxy_info() which returns (host, port)
+
+        Example:
+            >>> result = sandbox.expose_port(8080)
+            >>> result.port
+            8080
+            >>> result.exposed_at
+            'https://app-name-org.koyeb.app'
+        """
+        from .executor_client import SandboxClient
+
+        sandbox_url = self._get_sandbox_url()
+        if not sandbox_url:
+            raise SandboxError("Unable to get sandbox URL")
+        if not self.sandbox_secret:
+            raise SandboxError("Sandbox secret not available")
+
+        client = SandboxClient(sandbox_url, self.sandbox_secret)
+        try:
+            # Always unbind any existing port first
+            try:
+                client.unbind_port()
+            except Exception:
+                # Ignore errors when unbinding - it's okay if no port was bound
+                pass
+
+            # Now bind the new port
+            response = client.bind_port(port)
+            if not response.get("success", False):
+                error_msg = response.get("error", "Unknown error")
+                raise SandboxError(f"Failed to expose port {port}: {error_msg}")
+
+            # Get domain for exposed_at
+            domain = self.get_domain()
+            if not domain:
+                raise SandboxError("Domain not available for exposed port")
+
+            # Return the port from response if available, otherwise use the requested port
+            exposed_port = int(response.get("port", port))
+            exposed_at = f"https://{domain}"
+            return ExposedPort(port=exposed_port, exposed_at=exposed_at)
+        except Exception as e:
+            if isinstance(e, SandboxError):
+                raise
+            raise SandboxError(f"Failed to expose port {port}: {str(e)}") from e
+
+    def unexpose_port(self) -> None:
+        """
+        Unexpose a port from external connections.
+
+        Removes the TCP proxy port binding, stopping traffic forwarding to the
+        previously bound port.
+
+        Raises:
+            SandboxError: If the port unbinding operation fails
+
+        Notes:
+            - After unexposing, the TCP proxy will no longer forward traffic
+            - Safe to call even if no port is currently bound
+        """
+        from .executor_client import SandboxClient
+
+        sandbox_url = self._get_sandbox_url()
+        if not sandbox_url:
+            raise SandboxError("Unable to get sandbox URL")
+        if not self.sandbox_secret:
+            raise SandboxError("Sandbox secret not available")
+
+        client = SandboxClient(sandbox_url, self.sandbox_secret)
+        try:
+            response = client.unbind_port()
+            if not response.get("success", False):
+                error_msg = response.get("error", "Unknown error")
+                raise SandboxError(f"Failed to unexpose port: {error_msg}")
+        except Exception as e:
+            if isinstance(e, SandboxError):
+                raise
+            raise SandboxError(f"Failed to unexpose port: {str(e)}") from e
+
 
 class AsyncSandbox(Sandbox):
     """
@@ -590,3 +705,17 @@ class AsyncSandbox(Sandbox):
         from .filesystem import AsyncSandboxFilesystem
 
         return AsyncSandboxFilesystem(self)
+
+    async def expose_port(self, port: int) -> ExposedPort:
+        """Expose a port to external connections via TCP proxy asynchronously."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, super().expose_port, port)
+
+    async def unexpose_port(self) -> None:
+        """Unexpose a port from external connections asynchronously."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, super().unexpose_port)

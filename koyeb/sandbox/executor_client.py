@@ -276,3 +276,52 @@ class SandboxClient:
             "POST", f"{self.base_url}/list_dir", json=payload, headers=self.headers
         )
         return response.json()
+
+    def bind_port(self, port: int) -> Dict[str, Any]:
+        """
+        Bind a port to the TCP proxy for external access.
+
+        Configures the TCP proxy to forward traffic to the specified port inside the sandbox.
+        This allows you to expose services running inside the sandbox to external connections.
+
+        Args:
+            port: The port number to bind to (must be a valid port number)
+
+        Returns:
+            Dict with success status, message, and port information
+
+        Notes:
+            - Only one port can be bound at a time
+            - Binding a new port will override the previous binding
+            - The port must be available and accessible within the sandbox environment
+        """
+        payload = {"port": str(port)}
+        response = self._request_with_retry(
+            "POST", f"{self.base_url}/bind_port", json=payload, headers=self.headers
+        )
+        return response.json()
+
+    def unbind_port(self, port: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Unbind a port from the TCP proxy.
+
+        Removes the TCP proxy port binding, stopping traffic forwarding to the previously bound port.
+
+        Args:
+            port: Optional port number to unbind. If provided, it must match the currently bound port.
+                If not provided, any existing binding will be removed.
+
+        Returns:
+            Dict with success status and message
+
+        Notes:
+            - If a port is specified and doesn't match the currently bound port, the request will fail
+            - After unbinding, the TCP proxy will no longer forward traffic
+        """
+        payload = {}
+        if port is not None:
+            payload["port"] = str(port)
+        response = self._request_with_retry(
+            "POST", f"{self.base_url}/unbind_port", json=payload, headers=self.headers
+        )
+        return response.json()
