@@ -117,6 +117,7 @@ class SandboxExecutor:
                 env=env,
                 timeout=timeout,
                 api_token=self.sandbox.api_token,
+                sandbox_secret=self.sandbox.sandbox_secret,
                 on_stdout=on_stdout,
                 on_stderr=on_stderr,
             )
@@ -174,6 +175,7 @@ class AsyncSandboxExecutor(SandboxExecutor):
             env=env,
             timeout=timeout,
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
             on_stdout=on_stdout,
             on_stderr=on_stderr,
         )
@@ -445,6 +447,7 @@ async def _exec_async(
     env: Optional[Dict[str, str]] = None,
     timeout: int = 30,
     api_token: Optional[str] = None,
+    sandbox_secret: Optional[str] = None,
     on_stdout: Optional[Callable[[str], None]] = None,
     on_stderr: Optional[Callable[[str], None]] = None,
 ) -> CommandResult:
@@ -457,7 +460,13 @@ async def _exec_async(
     Supports streaming output via on_stdout/on_stderr callbacks.
     """
     full_cmd = _normalize_command(command, *args)
-    shell_command = _build_shell_command(full_cmd, cwd, env)
+    
+    # Merge sandbox_secret into environment if provided
+    exec_env = env.copy() if env else {}
+    if sandbox_secret:
+        exec_env["SANDBOX_SECRET"] = sandbox_secret
+    
+    shell_command = _build_shell_command(full_cmd, cwd, exec_env)
 
     return await _execute_websocket_command(
         instance_id=instance_id,

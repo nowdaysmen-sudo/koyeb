@@ -5,6 +5,7 @@ Koyeb Sandbox - Python SDK for creating and managing Koyeb sandboxes
 """
 
 import asyncio
+import secrets
 import time
 from typing import Dict, List, Optional
 
@@ -17,6 +18,8 @@ from .utils import (
     create_docker_source,
     get_api_client,
     is_sandbox_healthy,
+    create_koyeb_sandbox_ports,
+    create_koyeb_sandbox_routes
 )
 
 
@@ -34,6 +37,7 @@ class Sandbox:
         instance_id: str,
         name: Optional[str] = None,
         api_token: Optional[str] = None,
+        sandbox_secret: Optional[str] = None,
     ):
         self.sandbox_id = sandbox_id
         self.app_id = app_id
@@ -41,12 +45,13 @@ class Sandbox:
         self.instance_id = instance_id
         self.name = name
         self.api_token = api_token
+        self.sandbox_secret = sandbox_secret
         self._created_at = time.time()
 
     @classmethod
     def create(
         cls,
-        image: str = "docker.io/library/ubuntu:latest",
+        image: str = "koyeb/sandbox",
         name: str = "quick-sandbox",
         wait_ready: bool = True,
         instance_type: str = "nano",
@@ -60,7 +65,7 @@ class Sandbox:
             Create a new sandbox instance.
 
             Args:
-                image: Docker image to use (default: ubuntu:latest)
+                image: Docker image to use (default: koyeb/sandbox)
                 name: Name of the sandbox
                 wait_ready: Wait for sandbox to be ready (default: True)
                 instance_type: Instance type (default: nano)
@@ -102,7 +107,7 @@ class Sandbox:
     def _create_sync(
         cls,
         name: str,
-        image: str = "docker.io/library/ubuntu:latest",
+        image: str = "koyeb/sandbox",
         instance_type: str = "nano",
         ports: Optional[List[DeploymentPort]] = None,
         env: Optional[Dict[str, str]] = None,
@@ -116,12 +121,25 @@ class Sandbox:
         """
         apps_api, services_api, _ = get_api_client(api_token)
 
+        # Auto-configure ports for koyeb/sandbox image if not explicitly provided
+        if ports is None:
+            ports = create_koyeb_sandbox_ports()
+        routes = create_koyeb_sandbox_routes()
+
+        # Generate secure sandbox secret
+        sandbox_secret = secrets.token_urlsafe(32)
+        
+        # Add SANDBOX_SECRET to environment variables
+        if env is None:
+            env = {}
+        env["SANDBOX_SECRET"] = sandbox_secret
+
         app_name = f"sandbox-app-{name}-{int(time.time())}"
         app_response = apps_api.create_app(app=CreateApp(name=app_name))
         app_id = app_response.app.id
 
         env_vars = build_env_vars(env)
-        docker_source = create_docker_source(image, ["sleep", "infinity"])
+        docker_source = create_docker_source(image, [])
         deployment_definition = create_deployment_definition(
             name=f"sandbox-service-{name}",
             docker_source=docker_source,
@@ -129,6 +147,7 @@ class Sandbox:
             instance_type=instance_type,
             ports=ports,
             regions=regions,
+            routes=routes,
         )
 
         from koyeb.api.models.create_service import CreateService
@@ -175,6 +194,7 @@ class Sandbox:
             instance_id=instance_id,
             name=name,
             api_token=api_token,
+            sandbox_secret=sandbox_secret,
         )
 
     def wait_ready(self, timeout: int = 60, poll_interval: float = 2.0) -> bool:
@@ -241,7 +261,7 @@ class AsyncSandbox(Sandbox):
     @classmethod
     async def create(
         cls,
-        image: str = "docker.io/library/ubuntu:latest",
+        image: str = "koyeb/sandbox",
         name: str = "quick-sandbox",
         wait_ready: bool = True,
         instance_type: str = "nano",
@@ -255,7 +275,7 @@ class AsyncSandbox(Sandbox):
             Create a new sandbox instance with async support.
 
             Args:
-                image: Docker image to use (default: ubuntu:latest)
+                image: Docker image to use (default: koyeb/sandbox)
                 name: Name of the sandbox
                 wait_ready: Wait for sandbox to be ready (default: True)
                 instance_type: Instance type (default: nano)
@@ -300,6 +320,7 @@ class AsyncSandbox(Sandbox):
             instance_id=sync_result.instance_id,
             name=sync_result.name,
             api_token=sync_result.api_token,
+            sandbox_secret=sync_result.sandbox_secret,
         )
         sandbox._created_at = sync_result._created_at
 

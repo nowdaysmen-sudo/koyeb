@@ -81,7 +81,7 @@ async def main(run_long_tests=False):
         print("  → Creating sandbox...")
         create_start = time.time()
         sandbox = await AsyncSandbox.create(
-            image="python:3.11",
+            image="koyeb/sandbox",
             name="example-sandbox-timed",
             wait_ready=True,
             api_token=api_token,

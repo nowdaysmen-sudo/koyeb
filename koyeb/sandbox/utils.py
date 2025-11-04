@@ -15,6 +15,7 @@ from koyeb.api.models.deployment_definition_type import DeploymentDefinitionType
 from koyeb.api.models.deployment_env import DeploymentEnv
 from koyeb.api.models.deployment_instance_type import DeploymentInstanceType
 from koyeb.api.models.deployment_port import DeploymentPort
+from koyeb.api.models.deployment_route import DeploymentRoute
 from koyeb.api.models.deployment_scaling import DeploymentScaling
 from koyeb.api.models.docker_source import DockerSource
 from koyeb.api.models.instance_status import InstanceStatus
@@ -74,7 +75,7 @@ def create_docker_source(image: str, command_args: List[str]) -> DockerSource:
 
     Args:
         image: Docker image name
-        command_args: Command and arguments to run
+        command_args: Command and arguments to run (optional, empty list means use image default)
 
     Returns:
         DockerSource object
@@ -86,6 +87,52 @@ def create_docker_source(image: str, command_args: List[str]) -> DockerSource:
     )
 
 
+def create_koyeb_sandbox_ports() -> List[DeploymentPort]:
+    """
+    Create port configuration for koyeb/sandbox image.
+    
+    Creates two ports:
+    - Port 3030 exposed on HTTP, mounted on /koyeb-sandbox/
+    - Port 3031 exposed on HTTP, mounted on /
+    
+    Returns:
+        List of DeploymentPort objects configured for koyeb/sandbox
+    """
+    return [
+        DeploymentPort(
+            port=3030,
+            protocol="http",
+        ),
+        DeploymentPort(
+            port=3031,
+            protocol="http",
+        )
+    ]
+
+
+def create_koyeb_sandbox_routes() -> List[DeploymentRoute]:
+    """
+    Create route configuration for koyeb/sandbox image to make it publicly accessible.
+    
+    Creates two routes:
+    - Port 3030 accessible at /koyeb-sandbox/
+    - Port 3031 accessible at /
+    
+    Returns:
+        List of DeploymentRoute objects configured for koyeb/sandbox
+    """
+    return [
+        DeploymentRoute(
+            port=3030,
+            path="/koyeb-sandbox/"
+        ),
+        DeploymentRoute(
+            port=3031,
+            path="/"
+        )
+    ]
+
+
 def create_deployment_definition(
     name: str,
     docker_source: DockerSource,
@@ -93,6 +140,7 @@ def create_deployment_definition(
     instance_type: str,
     ports: Optional[List[DeploymentPort]] = None,
     regions: List[str] = None,
+    routes: Optional[List[DeploymentRoute]] = None,
 ) -> DeploymentDefinition:
     """
     Create deployment definition for a sandbox service.
@@ -104,6 +152,7 @@ def create_deployment_definition(
         instance_type: Instance type
         ports: List of ports (if provided, type becomes WEB, otherwise WORKER)
         regions: List of regions (defaults to North America)
+        routes: List of routes for public access
 
     Returns:
         DeploymentDefinition object
@@ -121,6 +170,7 @@ def create_deployment_definition(
         docker=docker_source,
         env=env_vars,
         ports=ports,
+        routes=routes,
         instance_types=[DeploymentInstanceType(type=instance_type)],
         scalings=[DeploymentScaling(min=1, max=1)],
         regions=regions,

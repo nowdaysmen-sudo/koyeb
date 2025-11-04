@@ -33,7 +33,7 @@ from koyeb import Sandbox
 
 # Create a sandbox
 sandbox = await Sandbox.create(
-    image="python:3.11",
+    image="koyeb/sandbox",
     name="my-sandbox",
     wait_ready=True,
     api_token=api_token,

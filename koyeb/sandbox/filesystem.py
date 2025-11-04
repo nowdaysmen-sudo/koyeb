@@ -84,6 +84,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=f"printf '%s' {escaped_b64} | base64 -d > {escaped_path}",
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
 
         if not result.success:
@@ -115,12 +116,14 @@ class SandboxFilesystem:
                 instance_id=self.sandbox.instance_id,
                 command=f"base64 < {escaped_path}",
                 api_token=self.sandbox.api_token,
+                sandbox_secret=self.sandbox.sandbox_secret,
             )
         else:
             result = await _exec_async(
                 instance_id=self.sandbox.instance_id,
                 command=f"cat {escaped_path}",
                 api_token=self.sandbox.api_token,
+                sandbox_secret=self.sandbox.sandbox_secret,
             )
 
         if not result.success:
@@ -151,12 +154,14 @@ class SandboxFilesystem:
                 instance_id=self.sandbox.instance_id,
                 command=["mkdir", "-p", path],
                 api_token=self.sandbox.api_token,
+                sandbox_secret=self.sandbox.sandbox_secret,
             )
         else:
             result = await _exec_async(
                 instance_id=self.sandbox.instance_id,
                 command=["mkdir", path],
                 api_token=self.sandbox.api_token,
+                sandbox_secret=self.sandbox.sandbox_secret,
             )
 
         if not result.success:
@@ -186,6 +191,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["ls", "-A", path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
 
         if not result.success:
@@ -214,6 +220,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["rm", path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
 
         if not result.success:
@@ -240,6 +247,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["rmdir", path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
 
         if not result.success:
@@ -269,6 +277,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["mv", old_path, new_path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
 
         if not result.success:
@@ -296,6 +305,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["mv", source_path, destination_path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
 
         if not result.success:
@@ -329,6 +339,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["test", "-e", path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
         return result.success
 
@@ -343,6 +354,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["test", "-f", path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
         return result.success
 
@@ -357,6 +369,7 @@ class SandboxFilesystem:
             instance_id=self.sandbox.instance_id,
             command=["test", "-d", path],
             api_token=self.sandbox.api_token,
+            sandbox_secret=self.sandbox.sandbox_secret,
         )
         return result.success
 
