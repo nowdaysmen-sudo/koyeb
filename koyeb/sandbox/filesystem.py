@@ -2,18 +2,17 @@
 
 """
 Filesystem operations for Koyeb Sandbox instances
-Using only the primitives available in the Koyeb API
+Using SandboxClient HTTP API
 """
 
 import asyncio
 import base64
 import os
-import shlex
 from dataclasses import dataclass
 from typing import Dict, List, Union
 
-from .exec import _exec_async
-from .utils import SandboxError, ensure_sandbox_healthy
+from .executor_client import SandboxClient
+from .utils import SandboxError
 
 
 class SandboxFilesystemError(SandboxError):
@@ -39,13 +38,25 @@ class FileInfo:
 class SandboxFilesystem:
     """
     Synchronous filesystem operations for Koyeb Sandbox instances.
-    Using only the primitives available in the Koyeb API.
+    Using SandboxClient HTTP API.
     
     For async usage, use AsyncSandboxFilesystem instead.
     """
 
     def __init__(self, sandbox):
         self.sandbox = sandbox
+        self._client = None
+
+    def _get_client(self) -> SandboxClient:
+        """Get or create SandboxClient instance"""
+        if self._client is None:
+            sandbox_url = self.sandbox.get_sandbox_url()
+            if not sandbox_url:
+                raise SandboxError("Unable to get sandbox URL")
+            if not self.sandbox.sandbox_secret:
+                raise SandboxError("Sandbox secret not available")
+            self._client = SandboxClient(sandbox_url, self.sandbox.sandbox_secret)
+        return self._client
 
     def write_file(
         self, path: str, content: Union[str, bytes], encoding: str = "utf-8"
@@ -58,39 +69,17 @@ class SandboxFilesystem:
             content: Content to write (string or bytes)
             encoding: File encoding (default: "utf-8"). Use "base64" for binary data.
         """
-        asyncio.run(self._write_file_async(path, content, encoding))
-
-    async def _write_file_async(
-        self, path: str, content: Union[str, bytes], encoding: str = "utf-8"
-    ) -> None:
-        """Internal async implementation for write_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        escaped_path = shlex.quote(path)
-
+        client = self._get_client()
+        
         if isinstance(content, bytes):
-            content_str = content.decode("utf-8", errors="replace")
+            content_str = content.decode("utf-8")
         else:
             content_str = content
-
-        if encoding == "base64":
-            content_b64 = content_str
-        else:
-            content_b64 = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
-
-        escaped_b64 = shlex.quote(content_b64)
-
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=f"printf '%s' {escaped_b64} | base64 -d > {escaped_path}",
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
-
-        if not result.success:
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {path}")
-            raise SandboxFilesystemError(f"Failed to write file: {result.stderr}")
+        
+        try:
+            client.write_file(path, content_str)
+        except Exception as e:
+            raise SandboxFilesystemError(f"Failed to write file: {str(e)}")
 
     def read_file(self, path: str, encoding: str = "utf-8") -> FileInfo:
         """
@@ -103,37 +92,17 @@ class SandboxFilesystem:
         Returns:
             FileInfo: Object with content and encoding
         """
-        return asyncio.run(self._read_file_async(path, encoding))
-
-    async def _read_file_async(self, path: str, encoding: str = "utf-8") -> FileInfo:
-        """Internal async implementation for read_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        escaped_path = shlex.quote(path)
-
-        if encoding == "base64":
-            result = await _exec_async(
-                instance_id=self.sandbox.instance_id,
-                command=f"base64 < {escaped_path}",
-                api_token=self.sandbox.api_token,
-                sandbox_secret=self.sandbox.sandbox_secret,
-            )
-        else:
-            result = await _exec_async(
-                instance_id=self.sandbox.instance_id,
-                command=f"cat {escaped_path}",
-                api_token=self.sandbox.api_token,
-                sandbox_secret=self.sandbox.sandbox_secret,
-            )
-
-        if not result.success:
-            if "No such file or directory" in result.stderr:
+        client = self._get_client()
+        
+        try:
+            response = client.read_file(path)
+            content = response.get('content', '')
+            return FileInfo(content=content, encoding=encoding)
+        except Exception as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
                 raise FileNotFoundError(f"File not found: {path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {path}")
-            raise SandboxFilesystemError(f"Failed to read file: {result.stderr}")
-
-        return FileInfo(content=result.stdout.strip(), encoding=encoding)
+            raise SandboxFilesystemError(f"Failed to read file: {error_msg}")
 
     def mkdir(self, path: str, recursive: bool = False) -> None:
         """
@@ -143,33 +112,15 @@ class SandboxFilesystem:
             path: Absolute path to the directory
             recursive: Create parent directories if needed (default: False)
         """
-        asyncio.run(self._mkdir_async(path, recursive))
-
-    async def _mkdir_async(self, path: str, recursive: bool = False) -> None:
-        """Internal async implementation for mkdir"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        if recursive:
-            result = await _exec_async(
-                instance_id=self.sandbox.instance_id,
-                command=["mkdir", "-p", path],
-                api_token=self.sandbox.api_token,
-                sandbox_secret=self.sandbox.sandbox_secret,
-            )
-        else:
-            result = await _exec_async(
-                instance_id=self.sandbox.instance_id,
-                command=["mkdir", path],
-                api_token=self.sandbox.api_token,
-                sandbox_secret=self.sandbox.sandbox_secret,
-            )
-
-        if not result.success:
-            if "File exists" in result.stderr:
+        client = self._get_client()
+        
+        try:
+            client.make_dir(path)
+        except Exception as e:
+            error_msg = str(e)
+            if "exists" in error_msg.lower():
                 raise FileExistsError(f"Directory already exists: {path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {path}")
-            raise SandboxFilesystemError(f"Failed to create directory: {result.stderr}")
+            raise SandboxFilesystemError(f"Failed to create directory: {error_msg}")
 
     def list_dir(self, path: str = ".") -> List[str]:
         """
@@ -181,27 +132,17 @@ class SandboxFilesystem:
         Returns:
             List[str]: Names of files and directories within the specified path.
         """
-        return asyncio.run(self._list_dir_async(path))
-
-    async def _list_dir_async(self, path: str = ".") -> List[str]:
-        """Internal async implementation for list_dir"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["ls", "-A", path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
-
-        if not result.success:
-            if "No such file or directory" in result.stderr:
+        client = self._get_client()
+        
+        try:
+            response = client.list_dir(path)
+            entries = response.get('entries', [])
+            return entries
+        except Exception as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
                 raise FileNotFoundError(f"Directory not found: {path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {path}")
-            raise SandboxFilesystemError(f"Failed to list directory: {result.stderr}")
-
-        return [item for item in result.stdout.splitlines() if item]
+            raise SandboxFilesystemError(f"Failed to list directory: {error_msg}")
 
     def delete_file(self, path: str) -> None:
         """
@@ -210,25 +151,15 @@ class SandboxFilesystem:
         Args:
             path: Absolute path to the file
         """
-        asyncio.run(self._delete_file_async(path))
-
-    async def _delete_file_async(self, path: str) -> None:
-        """Internal async implementation for delete_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["rm", path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
-
-        if not result.success:
-            if "No such file or directory" in result.stderr:
+        client = self._get_client()
+        
+        try:
+            client.delete_file(path)
+        except Exception as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
                 raise FileNotFoundError(f"File not found: {path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {path}")
-            raise SandboxFilesystemError(f"Failed to delete file: {result.stderr}")
+            raise SandboxFilesystemError(f"Failed to delete file: {error_msg}")
 
     def delete_dir(self, path: str) -> None:
         """
@@ -237,27 +168,17 @@ class SandboxFilesystem:
         Args:
             path: Absolute path to the directory
         """
-        asyncio.run(self._delete_dir_async(path))
-
-    async def _delete_dir_async(self, path: str) -> None:
-        """Internal async implementation for delete_dir"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["rmdir", path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
-
-        if not result.success:
-            if "No such file or directory" in result.stderr:
+        client = self._get_client()
+        
+        try:
+            client.delete_dir(path)
+        except Exception as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
                 raise FileNotFoundError(f"Directory not found: {path}")
-            if "Directory not empty" in result.stderr:
+            if "not empty" in error_msg.lower():
                 raise SandboxFilesystemError(f"Directory not empty: {path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {path}")
-            raise SandboxFilesystemError(f"Failed to delete directory: {result.stderr}")
+            raise SandboxFilesystemError(f"Failed to delete directory: {error_msg}")
 
     def rename_file(self, old_path: str, new_path: str) -> None:
         """
@@ -267,24 +188,14 @@ class SandboxFilesystem:
             old_path: Current file path
             new_path: New file path
         """
-        asyncio.run(self._rename_file_async(old_path, new_path))
-
-    async def _rename_file_async(self, old_path: str, new_path: str) -> None:
-        """Internal async implementation for rename_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["mv", old_path, new_path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
-
+        # Use exec since there's no direct rename in SandboxClient
+        from .exec import SandboxExecutor
+        executor = SandboxExecutor(self.sandbox)
+        result = executor(f"mv {old_path} {new_path}")
+        
         if not result.success:
-            if "No such file or directory" in result.stderr:
+            if "No such file" in result.stderr:
                 raise FileNotFoundError(f"File not found: {old_path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {old_path}")
             raise SandboxFilesystemError(f"Failed to rename file: {result.stderr}")
 
     def move_file(self, source_path: str, destination_path: str) -> None:
@@ -295,24 +206,14 @@ class SandboxFilesystem:
             source_path: Current file path
             destination_path: Destination path
         """
-        asyncio.run(self._move_file_async(source_path, destination_path))
-
-    async def _move_file_async(self, source_path: str, destination_path: str) -> None:
-        """Internal async implementation for move_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["mv", source_path, destination_path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
-
+        # Use exec since there's no direct move in SandboxClient
+        from .exec import SandboxExecutor
+        executor = SandboxExecutor(self.sandbox)
+        result = executor(f"mv {source_path} {destination_path}")
+        
         if not result.success:
-            if "No such file or directory" in result.stderr:
+            if "No such file" in result.stderr:
                 raise FileNotFoundError(f"File not found: {source_path}")
-            if "Permission denied" in result.stderr:
-                raise SandboxFilesystemError(f"Permission denied: {source_path}")
             raise SandboxFilesystemError(f"Failed to move file: {result.stderr}")
 
     def write_files(self, files: List[Dict[str, str]]) -> None:
@@ -330,47 +231,23 @@ class SandboxFilesystem:
 
     def exists(self, path: str) -> bool:
         """Check if file/directory exists synchronously"""
-        return asyncio.run(self._exists_async(path))
-
-    async def _exists_async(self, path: str) -> bool:
-        """Internal async implementation for exists"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["test", "-e", path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
+        from .exec import SandboxExecutor
+        executor = SandboxExecutor(self.sandbox)
+        result = executor(f"test -e {path}")
         return result.success
 
     def is_file(self, path: str) -> bool:
         """Check if path is a file synchronously"""
-        return asyncio.run(self._is_file_async(path))
-
-    async def _is_file_async(self, path: str) -> bool:
-        """Internal async implementation for is_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["test", "-f", path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
+        from .exec import SandboxExecutor
+        executor = SandboxExecutor(self.sandbox)
+        result = executor(f"test -f {path}")
         return result.success
 
     def is_dir(self, path: str) -> bool:
         """Check if path is a directory synchronously"""
-        return asyncio.run(self._is_dir_async(path))
-
-    async def _is_dir_async(self, path: str) -> bool:
-        """Internal async implementation for is_dir"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-        result = await _exec_async(
-            instance_id=self.sandbox.instance_id,
-            command=["test", "-d", path],
-            api_token=self.sandbox.api_token,
-            sandbox_secret=self.sandbox.sandbox_secret,
-        )
+        from .exec import SandboxExecutor
+        executor = SandboxExecutor(self.sandbox)
+        result = executor(f"test -d {path}")
         return result.success
 
     def upload_file(self, local_path: str, remote_path: str) -> None:
@@ -381,19 +258,13 @@ class SandboxFilesystem:
             local_path: Path to the local file
             remote_path: Destination path in the sandbox
         """
-        asyncio.run(self._upload_file_async(local_path, remote_path))
-
-    async def _upload_file_async(self, local_path: str, remote_path: str) -> None:
-        """Internal async implementation for upload_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
         if not os.path.exists(local_path):
             raise FileNotFoundError(f"Local file not found: {local_path}")
 
         with open(local_path, "rb") as f:
-            content = base64.b64encode(f.read()).decode("utf-8")
-
-        await self._write_file_async(remote_path, content, encoding="base64")
+            content = f.read().decode("utf-8")
+        
+        self.write_file(remote_path, content)
 
     def download_file(self, remote_path: str, local_path: str) -> None:
         """
@@ -403,15 +274,9 @@ class SandboxFilesystem:
             remote_path: Path to the file in the sandbox
             local_path: Destination path on the local filesystem
         """
-        asyncio.run(self._download_file_async(remote_path, local_path))
-
-    async def _download_file_async(self, remote_path: str, local_path: str) -> None:
-        """Internal async implementation for download_file"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
-        file_info = await self._read_file_async(remote_path, encoding="base64")
-        content = base64.b64decode(file_info.content)
-
+        file_info = self.read_file(remote_path)
+        content = file_info.content.encode("utf-8")
+        
         with open(local_path, "wb") as f:
             f.write(content)
 
@@ -435,24 +300,13 @@ class SandboxFilesystem:
             path: Path to remove
             recursive: Remove recursively
         """
-        asyncio.run(self._rm_async(path, recursive))
-
-    async def _rm_async(self, path: str, recursive: bool = False) -> None:
-        """Internal async implementation for rm"""
-        ensure_sandbox_healthy(self.sandbox.instance_id, self.sandbox.api_token)
-
+        from .exec import SandboxExecutor
+        executor = SandboxExecutor(self.sandbox)
+        
         if recursive:
-            result = await _exec_async(
-                instance_id=self.sandbox.instance_id,
-                command=["rm", "-rf", path],
-                api_token=self.sandbox.api_token,
-            )
+            result = executor(f"rm -rf {path}")
         else:
-            result = await _exec_async(
-                instance_id=self.sandbox.instance_id,
-                command=["rm", path],
-                api_token=self.sandbox.api_token,
-            )
+            result = executor(f"rm {path}")
 
         if not result.success:
             if "No such file or directory" in result.stderr:
@@ -490,7 +344,8 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             content: Content to write (string or bytes)
             encoding: File encoding (default: "utf-8"). Use "base64" for binary data.
         """
-        await self._write_file_async(path, content, encoding)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.write_file, path, content, encoding)
 
     async def read_file(self, path: str, encoding: str = "utf-8") -> FileInfo:
         """
@@ -503,7 +358,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
         Returns:
             FileInfo: Object with content and encoding
         """
-        return await self._read_file_async(path, encoding)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).read_file(path, encoding)
+        )
 
     async def mkdir(self, path: str, recursive: bool = False) -> None:
         """
@@ -513,7 +372,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             path: Absolute path to the directory
             recursive: Create parent directories if needed (default: False)
         """
-        await self._mkdir_async(path, recursive)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).mkdir(path, recursive)
+        )
 
     async def list_dir(self, path: str = ".") -> List[str]:
         """
@@ -525,7 +388,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
         Returns:
             List[str]: Names of files and directories within the specified path.
         """
-        return await self._list_dir_async(path)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).list_dir(path)
+        )
 
     async def delete_file(self, path: str) -> None:
         """
@@ -534,7 +401,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
         Args:
             path: Absolute path to the file
         """
-        await self._delete_file_async(path)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).delete_file(path)
+        )
 
     async def delete_dir(self, path: str) -> None:
         """
@@ -543,7 +414,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
         Args:
             path: Absolute path to the directory
         """
-        await self._delete_dir_async(path)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).delete_dir(path)
+        )
 
     async def rename_file(self, old_path: str, new_path: str) -> None:
         """
@@ -553,7 +428,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             old_path: Current file path
             new_path: New file path
         """
-        await self._rename_file_async(old_path, new_path)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).rename_file(old_path, new_path)
+        )
 
     async def move_file(self, source_path: str, destination_path: str) -> None:
         """
@@ -563,7 +442,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             source_path: Current file path
             destination_path: Destination path
         """
-        await self._move_file_async(source_path, destination_path)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).move_file(source_path, destination_path)
+        )
 
     async def write_files(self, files: List[Dict[str, str]]) -> None:
         """
@@ -580,15 +463,27 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
 
     async def exists(self, path: str) -> bool:
         """Check if file/directory exists asynchronously"""
-        return await self._exists_async(path)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).exists(path)
+        )
 
     async def is_file(self, path: str) -> bool:
         """Check if path is a file asynchronously"""
-        return await self._is_file_async(path)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).is_file(path)
+        )
 
     async def is_dir(self, path: str) -> bool:
         """Check if path is a directory asynchronously"""
-        return await self._is_dir_async(path)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).is_dir(path)
+        )
 
     async def upload_file(self, local_path: str, remote_path: str) -> None:
         """
@@ -598,7 +493,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             local_path: Path to the local file
             remote_path: Destination path in the sandbox
         """
-        await self._upload_file_async(local_path, remote_path)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).upload_file(local_path, remote_path)
+        )
 
     async def download_file(self, remote_path: str, local_path: str) -> None:
         """
@@ -608,7 +507,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             remote_path: Path to the file in the sandbox
             local_path: Destination path on the local filesystem
         """
-        await self._download_file_async(remote_path, local_path)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).download_file(remote_path, local_path)
+        )
 
     async def ls(self, path: str = ".") -> List[str]:
         """
@@ -630,7 +533,11 @@ class AsyncSandboxFilesystem(SandboxFilesystem):
             path: Path to remove
             recursive: Remove recursively
         """
-        await self._rm_async(path, recursive)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, 
+            lambda: super(AsyncSandboxFilesystem, self).rm(path, recursive)
+        )
 
     def open(self, path: str, mode: str = "r") -> "AsyncSandboxFileIO":
         """

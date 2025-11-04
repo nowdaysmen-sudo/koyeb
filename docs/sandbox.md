@@ -1214,6 +1214,8 @@ Get the current status of a sandbox instance.
 
 ```python
 def is_sandbox_healthy(instance_id: str,
+                       sandbox_url: str,
+                       sandbox_secret: str,
                        api_token: Optional[str] = None) -> bool
 ```
 

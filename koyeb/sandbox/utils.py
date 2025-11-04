@@ -205,22 +205,14 @@ def get_sandbox_url(service_id: str, api_token: Optional[str] = None) -> Optiona
         # Get the service app URL (this would be like: app-name-org.koyeb.app)
         # The URL is typically constructed from the app name and organization
         service = service_response.service
-        if hasattr(service, 'app_url') and service.app_url:
-            return f"https://{service.app_url}/koyeb-sandbox"
         
-        # If app_url is not available, we need to get it from the app
         if service.app_id:
             apps_api, _, _ = get_api_client(api_token)
             app_response = apps_api.get_app(service.app_id)
             app = app_response.app
             if hasattr(app, 'domains') and app.domains:
                 # Use the first public domain
-                return f"https://{app.domains[0]}/koyeb-sandbox"
-            # Fallback: construct from app name
-            if app.name and service.organization_id:
-                # This is an approximation - actual URL construction may vary
-                return f"https://{app.name}.koyeb.app/koyeb-sandbox"
-        
+                return f"https://{app.domains[0].name}/koyeb-sandbox"
         return None
     except (NotFoundException, ApiException, Exception):
         return None
@@ -228,26 +220,34 @@ def get_sandbox_url(service_id: str, api_token: Optional[str] = None) -> Optiona
 
 def is_sandbox_healthy(
     instance_id: str, 
-    api_token: Optional[str] = None,
-    sandbox_url: Optional[str] = None,
-    sandbox_secret: Optional[str] = None
+    sandbox_url: str,
+    sandbox_secret: str,
+    api_token: Optional[str] = None
 ) -> bool:
     """
     Check if sandbox is healthy and ready for operations.
     
-    This function checks both:
-    1. The Koyeb instance status (via API)
-    2. The sandbox executor health endpoint (via SandboxClient, if URL and secret are provided)
+    This function requires both sandbox_url and sandbox_secret to properly check:
+    1. The Koyeb instance status (via API) - using instance_id and api_token
+    2. The sandbox executor health endpoint (via SandboxClient) - using sandbox_url and sandbox_secret
     
     Args:
         instance_id: The Koyeb instance ID
         api_token: Koyeb API token
-        sandbox_url: Optional URL of the sandbox executor API
-        sandbox_secret: Optional secret for sandbox executor authentication
+        sandbox_url: URL of the sandbox executor API (required)
+        sandbox_secret: Secret for sandbox executor authentication (required)
         
     Returns:
         bool: True if sandbox is healthy, False otherwise
+        
+    Raises:
+        ValueError: If sandbox_url or sandbox_secret are not provided
     """
+    if not sandbox_url:
+        raise ValueError("sandbox_url is required for health check")
+    if not sandbox_secret:
+        raise ValueError("sandbox_secret is required for health check")
+    
     # Check Koyeb instance status
     instance_healthy = get_sandbox_status(instance_id, api_token) == InstanceStatus.HEALTHY
     
@@ -255,23 +255,19 @@ def is_sandbox_healthy(
     if not instance_healthy:
         return False
     
-    # If sandbox URL and secret are provided, also check executor health
-    if sandbox_url and sandbox_secret:
-        try:
-            client = SandboxClient(sandbox_url, sandbox_secret)
-            health_response = client.health()
-            # Check if health response indicates the server is healthy
-            # The exact response format may vary, but typically has a "status" field
-            if isinstance(health_response, dict):
-                status = health_response.get('status', '').lower()
-                return status in ['ok', 'healthy', 'ready']
-            return True  # If we got a response, consider it healthy
-        except Exception:
-            # If we can't reach the executor API, consider it unhealthy
-            return False
-    
-    # If only instance status was checked, return that result
-    return instance_healthy
+    # Check executor health
+    try:
+        client = SandboxClient(sandbox_url, sandbox_secret)
+        health_response = client.health()
+        # Check if health response indicates the server is healthy
+        # The exact response format may vary, but typically has a "status" field
+        if isinstance(health_response, dict):
+            status = health_response.get('status', '').lower()
+            return status in ['ok', 'healthy', 'ready']
+        return True  # If we got a response, consider it healthy
+    except Exception:
+        # If we can't reach the executor API, consider it unhealthy
+        return False
 
 
 def ensure_sandbox_healthy(instance_id: str, api_token: Optional[str] = None) -> None:

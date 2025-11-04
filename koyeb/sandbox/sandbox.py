@@ -210,9 +210,23 @@ class Sandbox:
             bool: True if sandbox became ready, False if timeout
         """
         start_time = time.time()
+        sandbox_url = None
 
         while time.time() - start_time < timeout:
-            is_healthy = is_sandbox_healthy(self.instance_id, self.api_token)
+            # Get sandbox URL on first iteration or if not yet retrieved
+            if sandbox_url is None:
+                sandbox_url = self.get_sandbox_url()
+                # If URL is not available yet, wait and retry
+                if sandbox_url is None:
+                    time.sleep(poll_interval)
+                    continue
+            
+            is_healthy = is_sandbox_healthy(
+                self.instance_id, 
+                sandbox_url=sandbox_url,
+                sandbox_secret=self.sandbox_secret,
+                api_token=self.api_token
+            )
 
             if is_healthy:
                 return True
@@ -252,9 +266,9 @@ class Sandbox:
         sandbox_url = self.get_sandbox_url()
         return is_sandbox_healthy(
             self.instance_id, 
-            self.api_token,
             sandbox_url=sandbox_url,
-            sandbox_secret=self.sandbox_secret
+            sandbox_secret=self.sandbox_secret,
+            api_token=self.api_token
         )
 
     @property
