@@ -44,6 +44,7 @@ dev = [
     "flake8>=7.3.0",
     "pydoc-markdown>=4.8.2",
     "pytest>=8.4.2",
+    "tqdm>=4.67.1",
 ]
 
 [tool.pylint.'MESSAGES CONTROL']
