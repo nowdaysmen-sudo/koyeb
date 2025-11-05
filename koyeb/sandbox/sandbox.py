@@ -45,7 +45,7 @@ class ProcessInfo(TypedDict, total=False):
     """Type definition for process information returned by list_processes."""
 
     id: str  # Process ID (UUID string)
-    cmd: str  # The command that was executed
+    command: str  # The command that was executed
     status: str  # Process status (e.g., "running", "completed")
     pid: int  # OS process ID (if running)
     exit_code: int  # Exit code (if completed)
@@ -643,7 +643,7 @@ class Sandbox:
         Returns:
             List[ProcessInfo]: List of process dictionaries, each containing:
                 - id: Process ID (UUID string)
-                - cmd: The command that was executed
+                - command: The command that was executed
                 - status: Process status (e.g., "running", "completed")
                 - pid: OS process ID (if running)
                 - exit_code: Exit code (if completed)
@@ -656,7 +656,7 @@ class Sandbox:
         Example:
             >>> processes = sandbox.list_processes()
             >>> for process in processes:
-            ...     print(f"{process['id']}: {process['cmd']} - {process['status']}")
+            ...     print(f"{process['id']}: {process['command']} - {process['status']}")
         """
         client = self._get_client()
         try:

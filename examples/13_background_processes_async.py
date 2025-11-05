@@ -44,6 +44,7 @@ async def main():
         processes = await sandbox.list_processes()
         for process in processes:
             print(f"  ID: {process.get('id', 'N/A')}")
+            print(f"  Command: {process.get('command', 'N/A')}")
             print(f"  Status: {process.get('status', 'N/A')}")
             if process.get("pid"):
                 print(f"  PID: {process.get('pid')}")
@@ -62,6 +63,7 @@ async def main():
         processes = await sandbox.list_processes()
         for process in processes:
             print(f"  ID: {process.get('id', 'N/A')}")
+            print(f"  Command: {process.get('command', 'N/A')}")
             print(f"  Status: {process.get('status', 'N/A')}")
             print()
 
@@ -83,6 +85,7 @@ async def main():
         processes = await sandbox.list_processes()
         for process in processes:
             print(f"  ID: {process.get('id', 'N/A')}")
+            print(f"  Command: {process.get('command', 'N/A')}")
             print(f"  Status: {process.get('status', 'N/A')}")
             print()
 

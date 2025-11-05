@@ -73,7 +73,7 @@ async def main():
         for process in processes:
             if process.get("status") == "running":
                 print(
-                    f"  {process.get('id')}: {process.get('cmd')} - {process.get('status')}"
+                    f"  {process.get('id')}: {process.get('command')} - {process.get('status')}"
                 )
 
         # Switch to a different port (e.g., 8081)

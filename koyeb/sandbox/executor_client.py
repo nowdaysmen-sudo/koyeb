@@ -473,7 +473,7 @@ class SandboxClient:
             Dict with a list of processes:
                 - processes: List of process objects, each containing:
                     - id: Process ID (UUID string)
-                    - cmd: The command that was executed
+                    - command: The command that was executed
                     - status: Process status (e.g., "running", "completed")
                     - pid: OS process ID (if running)
                     - exit_code: Exit code (if completed)
@@ -484,7 +484,7 @@ class SandboxClient:
             >>> client = SandboxClient("http://localhost:8080", "secret")
             >>> result = client.list_processes()
             >>> for process in result.get("processes", []):
-            ...     print(f"{process['id']}: {process['cmd']} - {process['status']}")
+            ...     print(f"{process['id']}: {process['command']} - {process['status']}")
         """
         response = self._request_with_retry(
             "GET", f"{self.base_url}/list_processes", headers=self.headers

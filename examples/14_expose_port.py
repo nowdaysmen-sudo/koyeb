@@ -69,7 +69,9 @@ def main():
         processes = sandbox.list_processes()
         for process in processes:
             if process.get("status") == "running":
-                print(f"  {process.get('id')}: {process.get('status')}")
+                print(
+                    f"  {process.get('id')}: {process.get('command')} - {process.get('status')}"
+                )
 
         # Switch to a different port (e.g., 8081)
         print("\nSwitching to port 8081...")
