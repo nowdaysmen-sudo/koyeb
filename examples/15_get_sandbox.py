@@ -50,10 +50,9 @@ def main():
         assert original_sandbox.id == retrieved_sandbox.id, "Sandbox IDs should match!"
         print("  ✓ Confirmed: Same sandbox retrieved")
 
-        # Check status
-        status = retrieved_sandbox.status()
+        # Check health
         is_healthy = retrieved_sandbox.is_healthy()
-        print(f"  Status: {status}, Healthy: {is_healthy}")
+        print(f"  Healthy: {is_healthy}")
 
         # Execute a command with the retrieved sandbox
         if is_healthy:

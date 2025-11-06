@@ -22,10 +22,9 @@ async def main():
             api_token=api_token,
         )
 
-        # Check status
-        status = await sandbox.status()
+        # Check health
         is_healthy = await sandbox.is_healthy()
-        print(f"Status: {status}, Healthy: {is_healthy}")
+        print(f"Healthy: {is_healthy}")
 
         # Test command
         result = await sandbox.exec("echo 'Sandbox is ready!'")

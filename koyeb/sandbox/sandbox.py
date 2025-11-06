@@ -31,7 +31,6 @@ from .utils import (
     create_koyeb_sandbox_routes,
     create_sandbox_client,
     get_api_client,
-    is_sandbox_healthy,
     logger,
     run_sync_in_executor,
     validate_port,
@@ -80,7 +79,6 @@ class Sandbox:
         sandbox_id: str,
         app_id: str,
         service_id: str,
-        instance_id: str,
         name: Optional[str] = None,
         api_token: Optional[str] = None,
         sandbox_secret: Optional[str] = None,
@@ -88,7 +86,6 @@ class Sandbox:
         self.sandbox_id = sandbox_id
         self.app_id = app_id
         self.service_id = service_id
-        self.instance_id = instance_id
         self.name = name
         self.api_token = api_token
         self.sandbox_secret = sandbox_secret
@@ -224,41 +221,11 @@ class Sandbox:
         create_service = CreateService(app_id=app_id, definition=deployment_definition)
         service_response = services_api.create_service(service=create_service)
         service_id = service_response.service.id
-        deployment_id = service_response.service.latest_deployment_id
-
-        deployments_api = DeploymentsApi(services_api.api_client)
-
-        max_wait = min(timeout // 2, 60) if timeout > 60 else timeout
-        wait_interval = 0.5
-        start_time = time.time()
-
-        while time.time() - start_time < max_wait:
-            try:
-                scaling_response = deployments_api.get_deployment_scaling(
-                    id=deployment_id
-                )
-
-                if scaling_response.replicas and scaling_response.replicas[0].instances:
-                    instance_id = scaling_response.replicas[0].instances[0].id
-                    break
-                else:
-                    logger.debug(
-                        f"Waiting for instances to be created... (elapsed: {time.time() - start_time:.1f}s)"
-                    )
-                    time.sleep(wait_interval)
-            except Exception as e:
-                logger.warning(f"Error getting deployment scaling: {e}")
-                time.sleep(wait_interval)
-        else:
-            raise SandboxError(
-                f"No instances found in deployment after {max_wait} seconds"
-            )
 
         return cls(
             sandbox_id=name,
             app_id=app_id,
             service_id=service_id,
-            instance_id=instance_id,
             name=name,
             api_token=api_token,
             sandbox_secret=sandbox_secret,
@@ -314,7 +281,6 @@ class Sandbox:
         # Get deployment to extract sandbox_secret from env vars
         deployment_id = service.active_deployment_id or service.latest_deployment_id
         sandbox_secret = None
-        instance_id = None
 
         if deployment_id:
             try:
@@ -329,36 +295,13 @@ class Sandbox:
                         if env_var.key == "SANDBOX_SECRET":
                             sandbox_secret = env_var.value
                             break
-
-                # Get instance_id from deployment scaling
-                try:
-                    scaling_response = deployments_api.get_deployment_scaling(
-                        id=deployment_id
-                    )
-                    if (
-                        scaling_response.replicas
-                        and scaling_response.replicas[0].instances
-                        and len(scaling_response.replicas[0].instances) > 0
-                    ):
-                        instance_id = scaling_response.replicas[0].instances[0].id
-                except Exception:
-                    logger.debug(
-                        f"Could not get instance for deployment {deployment_id}"
-                    )
             except Exception as e:
                 logger.debug(f"Could not get deployment {deployment_id}: {e}")
-
-        if not instance_id:
-            raise SandboxError(
-                f"Could not find instance for sandbox {id}. "
-                "The sandbox may not be fully provisioned yet."
-            )
 
         return cls(
             sandbox_id=service.id,
             app_id=service.app_id,
             service_id=service.id,
-            instance_id=instance_id,
             name=sandbox_name,
             api_token=api_token,
             sandbox_secret=sandbox_secret,
@@ -391,12 +334,7 @@ class Sandbox:
                     time.sleep(poll_interval)
                     continue
 
-            is_healthy = is_sandbox_healthy(
-                self.instance_id,
-                sandbox_url=sandbox_url,
-                sandbox_secret=self.sandbox_secret,
-                api_token=self.api_token,
-            )
+            is_healthy = self.is_healthy()
 
             if is_healthy:
                 return True
@@ -561,22 +499,25 @@ class Sandbox:
             error_msg = response.get("error", "Unknown error")
             raise SandboxError(f"Failed to {operation}: {error_msg}")
 
-    def status(self) -> str:
-        """Get current sandbox status"""
-        from .utils import get_sandbox_status
-
-        status = get_sandbox_status(self.instance_id, self.api_token)
-        return status.value
-
     def is_healthy(self) -> bool:
         """Check if sandbox is healthy and ready for operations"""
         sandbox_url = self._get_sandbox_url()
-        return is_sandbox_healthy(
-            self.instance_id,
-            sandbox_url=sandbox_url,
-            sandbox_secret=self.sandbox_secret,
-            api_token=self.api_token,
-        )
+        if not sandbox_url or not self.sandbox_secret:
+            return False
+
+        # Check executor health directly - this is what matters for operations
+        # If executor is healthy, the sandbox is usable (will wake up service if needed)
+        try:
+            from .executor_client import SandboxClient
+
+            client = SandboxClient(sandbox_url, self.sandbox_secret)
+            health_response = client.health()
+            if isinstance(health_response, dict):
+                status = health_response.get("status", "").lower()
+                return status in ["ok", "healthy", "ready"]
+            return True  # If we got a response, consider it healthy
+        except Exception:
+            return False
 
     @property
     def filesystem(self) -> "SandboxFilesystem":
@@ -874,7 +815,6 @@ class AsyncSandbox(Sandbox):
             sandbox_id=sync_sandbox.sandbox_id,
             app_id=sync_sandbox.app_id,
             service_id=sync_sandbox.service_id,
-            instance_id=sync_sandbox.instance_id,
             name=sync_sandbox.name,
             api_token=sync_sandbox.api_token,
             sandbox_secret=sync_sandbox.sandbox_secret,
@@ -952,7 +892,6 @@ class AsyncSandbox(Sandbox):
             sandbox_id=sync_result.sandbox_id,
             app_id=sync_result.app_id,
             service_id=sync_result.service_id,
-            instance_id=sync_result.instance_id,
             name=sync_result.name,
             api_token=sync_result.api_token,
             sandbox_secret=sync_result.sandbox_secret,
@@ -1028,11 +967,6 @@ class AsyncSandbox(Sandbox):
     @async_wrapper("delete")
     async def delete(self) -> None:
         """Delete the sandbox instance asynchronously."""
-        pass
-
-    @async_wrapper("status")
-    async def status(self) -> str:
-        """Get current sandbox status asynchronously"""
         pass
 
     @async_wrapper("is_healthy")

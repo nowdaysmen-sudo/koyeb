@@ -93,14 +93,13 @@ async def main(run_long_tests=False):
         tracker.record("Sandbox creation", create_duration, "setup")
         print(f"    ✓ took {create_duration:.1f}s")
 
-        # Check status with timing
-        print("  → Checking sandbox status...")
-        status_start = time.time()
-        await sandbox.status()
+        # Check health with timing
+        print("  → Checking sandbox health...")
+        health_start = time.time()
         await sandbox.is_healthy()
-        status_duration = time.time() - status_start
-        tracker.record("Status check", status_duration, "monitoring")
-        print(f"    ✓ took {status_duration:.1f}s")
+        health_duration = time.time() - health_start
+        tracker.record("Health check", health_duration, "monitoring")
+        print(f"    ✓ took {health_duration:.1f}s")
 
         # Test command execution with timing
         print("  → Executing initial test command...")
@@ -129,15 +128,15 @@ async def main(run_long_tests=False):
             tracker.record("Heavy computation", compute_duration, "long_tests")
             print(f"    ✓ took {compute_duration:.1f}s")
 
-            # Long test 3: Multiple status checks
-            print("  → [LONG TEST] Multiple status checks...")
+            # Long test 3: Multiple health checks
+            print("  → [LONG TEST] Multiple health checks...")
             multi_check_start = time.time()
             for i in range(5):
-                await sandbox.status()
+                await sandbox.is_healthy()
                 await asyncio.sleep(0.5)
             multi_check_duration = time.time() - multi_check_start
             tracker.record(
-                "Multiple status checks (5x)", multi_check_duration, "long_tests"
+                "Multiple health checks (5x)", multi_check_duration, "long_tests"
             )
             print(f"    ✓ took {multi_check_duration:.1f}s")
 

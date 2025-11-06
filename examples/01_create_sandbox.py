@@ -21,10 +21,9 @@ def main():
             api_token=api_token,
         )
 
-        # Check status
-        status = sandbox.status()
+        # Check health
         is_healthy = sandbox.is_healthy()
-        print(f"Status: {status}, Healthy: {is_healthy}")
+        print(f"Healthy: {is_healthy}")
 
         # Test command
         result = sandbox.exec("echo 'Sandbox is ready!'")
