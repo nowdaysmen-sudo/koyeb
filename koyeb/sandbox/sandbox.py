@@ -23,6 +23,7 @@ from .utils import (
     DEFAULT_POLL_INTERVAL,
     IdleTimeout,
     SandboxError,
+    SandboxTimeoutError,
     _is_light_sleep_enabled,
     async_wrapper,
     build_env_vars,
@@ -137,6 +138,10 @@ class Sandbox:
 
         Returns:
                 Sandbox: A new Sandbox instance
+
+        Raises:
+                ValueError: If API token is not provided
+                SandboxTimeoutError: If wait_ready is True and sandbox does not become ready within timeout
         """
         if api_token is None:
             api_token = os.getenv("KOYEB_API_TOKEN")
@@ -159,7 +164,13 @@ class Sandbox:
         )
 
         if wait_ready:
-            sandbox.wait_ready(timeout=timeout)
+            is_ready = sandbox.wait_ready(timeout=timeout)
+            if not is_ready:
+                raise SandboxTimeoutError(
+                    f"Sandbox '{sandbox.name}' did not become ready within {timeout} seconds. "
+                    f"The sandbox was created but may not be ready yet. "
+                    f"You can check its status with sandbox.is_healthy() or call sandbox.wait_ready() again."
+                )
 
         return sandbox
 
@@ -862,6 +873,10 @@ class AsyncSandbox(Sandbox):
 
         Returns:
                 AsyncSandbox: A new AsyncSandbox instance
+
+        Raises:
+                ValueError: If API token is not provided
+                SandboxTimeoutError: If wait_ready is True and sandbox does not become ready within timeout
         """
         if api_token is None:
             api_token = os.getenv("KOYEB_API_TOKEN")
@@ -899,7 +914,13 @@ class AsyncSandbox(Sandbox):
         sandbox._created_at = sync_result._created_at
 
         if wait_ready:
-            await sandbox.wait_ready(timeout=timeout)
+            is_ready = await sandbox.wait_ready(timeout=timeout)
+            if not is_ready:
+                raise SandboxTimeoutError(
+                    f"Sandbox '{sandbox.name}' did not become ready within {timeout} seconds. "
+                    f"The sandbox was created but may not be ready yet. "
+                    f"You can check its status with sandbox.is_healthy() or call sandbox.wait_ready() again."
+                )
 
         return sandbox
 

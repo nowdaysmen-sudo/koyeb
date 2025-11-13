@@ -681,3 +681,7 @@ def create_sandbox_client(
 
 class SandboxError(Exception):
     """Base exception for sandbox operations"""
+
+
+class SandboxTimeoutError(SandboxError):
+    """Raised when a sandbox operation times out"""
