@@ -113,6 +113,7 @@ class Sandbox:
         timeout: int = 300,
         idle_timeout: Optional[IdleTimeout] = None,
         enable_tcp_proxy: bool = False,
+        privileged: bool = False,
     ) -> Sandbox:
         """
             Create a new sandbox instance.
@@ -135,6 +136,7 @@ class Sandbox:
                     - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
                     - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
                 enable_tcp_proxy: If True, enables TCP proxy for direct TCP access to port 3031
+                privileged: If True, run the container in privileged mode (default: False)
 
         Returns:
                 Sandbox: A new Sandbox instance
@@ -161,6 +163,7 @@ class Sandbox:
             timeout=timeout,
             idle_timeout=idle_timeout,
             enable_tcp_proxy=enable_tcp_proxy,
+            privileged=privileged,
         )
 
         if wait_ready:
@@ -187,6 +190,7 @@ class Sandbox:
         timeout: int = 300,
         idle_timeout: Optional[IdleTimeout] = None,
         enable_tcp_proxy: bool = False,
+        privileged: bool = False,
     ) -> Sandbox:
         """
         Synchronous creation method that returns creation parameters.
@@ -215,7 +219,7 @@ class Sandbox:
         app_id = app_response.app.id
 
         env_vars = build_env_vars(env)
-        docker_source = create_docker_source(image, [], privileged=True)
+        docker_source = create_docker_source(image, [], privileged=privileged)
         deployment_definition = create_deployment_definition(
             name=name,
             docker_source=docker_source,
@@ -848,6 +852,7 @@ class AsyncSandbox(Sandbox):
         timeout: int = 300,
         idle_timeout: Optional[IdleTimeout] = None,
         enable_tcp_proxy: bool = False,
+        privileged: bool = False,
     ) -> AsyncSandbox:
         """
             Create a new sandbox instance with async support.
@@ -870,6 +875,7 @@ class AsyncSandbox(Sandbox):
                     - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
                     - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
                 enable_tcp_proxy: If True, enables TCP proxy for direct TCP access to port 3031
+                privileged: If True, run the container in privileged mode (default: False)
 
         Returns:
                 AsyncSandbox: A new AsyncSandbox instance
@@ -899,6 +905,7 @@ class AsyncSandbox(Sandbox):
                 timeout=timeout,
                 idle_timeout=idle_timeout,
                 enable_tcp_proxy=enable_tcp_proxy,
+                privileged=privileged,
             ),
         )
 

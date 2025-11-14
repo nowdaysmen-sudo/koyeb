@@ -988,7 +988,8 @@ def create(cls,
            api_token: Optional[str] = None,
            timeout: int = 300,
            idle_timeout: Optional[IdleTimeout] = None,
-           enable_tcp_proxy: bool = False) -> Sandbox
+           enable_tcp_proxy: bool = False,
+           privileged: bool = False) -> Sandbox
 ```
 
 Create a new sandbox instance.
@@ -1012,6 +1013,7 @@ Create a new sandbox instance.
   - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
   - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
 - `enable_tcp_proxy` - If True, enables TCP proxy for direct TCP access to port 3031
+- `privileged` - If True, run the container in privileged mode (default: False)
   
 
 **Returns**:
@@ -1455,7 +1457,8 @@ async def create(cls,
                  api_token: Optional[str] = None,
                  timeout: int = 300,
                  idle_timeout: Optional[IdleTimeout] = None,
-                 enable_tcp_proxy: bool = False) -> AsyncSandbox
+                 enable_tcp_proxy: bool = False,
+                 privileged: bool = False) -> AsyncSandbox
 ```
 
 Create a new sandbox instance with async support.
@@ -1479,6 +1482,7 @@ Create a new sandbox instance with async support.
   - int > 0: Deep sleep only (e.g., 600 for 600s deep sleep)
   - dict: Explicit configuration with {"light_sleep": 300, "deep_sleep": 600}
 - `enable_tcp_proxy` - If True, enables TCP proxy for direct TCP access to port 3031
+- `privileged` - If True, run the container in privileged mode (default: False)
   
 
 **Returns**:
