@@ -1,5 +1,5 @@
 [tool.bumpver]
-current_version = "1.1.1"
+current_version = "1.2.0"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit = false
 tag = false
@@ -8,7 +8,6 @@ push = false
 [tool.bumpver.file_patterns]
 "Makefile" = ["PACKAGE_VERSION?={version}"]
 "pyproject.toml" = ['version = "{version}"']
-"uv.lock" = ['version = "{version}"']
 "koyeb/*.md" = ["Package version: {version}"]
 "koyeb/__init__.py" = ['__version__ = "{version}"']
 "koyeb/api/__init__.py" = ['__version__ = "{version}"']
