@@ -29,7 +29,6 @@ async def main():
         print(f"✓ Created sandbox: {original_sandbox.name}")
         print(f"  Service ID: {original_sandbox.service_id}")
         print(f"  App ID: {original_sandbox.app_id}")
-        print(f"  Instance ID: {original_sandbox.instance_id}")
 
         # Execute a command with the original sandbox
         result = await original_sandbox.exec("echo 'Hello from original sandbox!'")
@@ -45,7 +44,6 @@ async def main():
         print(f"✓ Retrieved sandbox: {retrieved_sandbox.name}")
         print(f"  Service ID: {retrieved_sandbox.service_id}")
         print(f"  App ID: {retrieved_sandbox.app_id}")
-        print(f"  Instance ID: {retrieved_sandbox.instance_id}")
 
         # Verify it's the same sandbox
         assert original_sandbox.id == retrieved_sandbox.id, "Sandbox IDs should match!"
