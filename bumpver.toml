@@ -8,6 +8,7 @@ push = false
 [tool.bumpver.file_patterns]
 "Makefile" = ["PACKAGE_VERSION?={version}"]
 "pyproject.toml" = ['version = "{version}"']
+"uv.lock" = ['version = "{version}"']
 "koyeb/*.md" = ["Package version: {version}"]
 "koyeb/__init__.py" = ['__version__ = "{version}"']
 "koyeb/api/__init__.py" = ['__version__ = "{version}"']
