@@ -987,7 +987,7 @@ def create(cls,
            region: Optional[str] = None,
            api_token: Optional[str] = None,
            timeout: int = 300,
-           idle_timeout: Optional[IdleTimeout] = 300,
+           idle_timeout: int = 300,
            enable_tcp_proxy: bool = False,
            privileged: bool = False,
            _experimental_enable_light_sleep: bool = False) -> Sandbox
@@ -1456,7 +1456,7 @@ async def create(
         region: Optional[str] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
-        idle_timeout: Optional[IdleTimeout] = 300,
+        idle_timeout: int = 300,
         enable_tcp_proxy: bool = False,
         privileged: bool = False,
         _experimental_enable_light_sleep: bool = False) -> AsyncSandbox
@@ -1706,28 +1706,6 @@ seconds
 
 seconds for HTTP requests
 
-<a id="koyeb/sandbox.utils.IdleTimeoutConfig"></a>
-
-## IdleTimeoutConfig Objects
-
-```python
-class IdleTimeoutConfig(TypedDict)
-```
-
-Configuration for idle timeout with light and deep sleep.
-
-<a id="koyeb/sandbox.utils.IdleTimeoutConfig.light_sleep"></a>
-
-#### light\_sleep
-
-Optional, but if provided, deep_sleep is required
-
-<a id="koyeb/sandbox.utils.IdleTimeoutConfig.deep_sleep"></a>
-
-#### deep\_sleep
-
-Required
-
 <a id="koyeb/sandbox.utils.get_api_client"></a>
 
 #### get\_api\_client
@@ -1869,7 +1847,7 @@ def create_deployment_definition(
         exposed_port_protocol: Optional[str] = None,
         region: Optional[str] = None,
         routes: Optional[List[DeploymentRoute]] = None,
-        idle_timeout: Optional[IdleTimeout] = 300,
+        idle_timeout: int = 300,
         enable_tcp_proxy: bool = False,
         _experimental_enable_light_sleep: bool = False
 ) -> DeploymentDefinition
