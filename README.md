@@ -9,9 +9,9 @@ This is the official Python SDK for Koyeb, a platform that allows you to deploy 
 
 ## Koyeb Sanboxes
 
-A **code sandbox** is an isolated, ephemeral environment designed to safely run, test, and experiment with code without affecting other systems or requiring complex setup. It provides developers with a virtualized or containerized execution space where dependencies, environment variables, and runtime contexts can be fully controlled and discarded after use.
+A **Kode sandbox** is an isolated, ephemeral environment designed to safely run, test, and experiment with code without affecting other systems or requiring complex setup. It provides developers with a virtualized or containerized execution space where dependencies, environment variables, and runtime contexts can be fully controlled and discarded after use.
 
-You should use a code sandbox to:
+You should use a sandbox to:
 
 - Execute untrusted or user-generated code securely
 - Prototype applications quickly
