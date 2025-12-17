@@ -6,6 +6,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **name** | **str** |  | [optional] 
+**life_cycle** | [**AppLifeCycle**](AppLifeCycle.md) |  | [optional] 
 
 ## Example
 

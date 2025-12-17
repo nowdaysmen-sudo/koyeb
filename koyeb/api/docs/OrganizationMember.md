@@ -8,6 +8,7 @@ Name | Type | Description | Notes
 **id** | **str** |  | [optional] 
 **organization_id** | **str** |  | [optional] 
 **user_id** | **str** |  | [optional] 
+**external_id** | **str** |  | [optional] 
 **joined_at** | **datetime** |  | [optional] 
 **role** | [**UserRoleRole**](UserRoleRole.md) |  | [optional] [default to UserRoleRole.INVALID]
 **status** | [**OrganizationMemberStatus**](OrganizationMemberStatus.md) |  | [optional] [default to OrganizationMemberStatus.INVALID]

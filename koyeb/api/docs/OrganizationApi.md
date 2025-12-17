@@ -20,6 +20,7 @@ Method | HTTP request | Description
 [**update_budget**](OrganizationApi.md#update_budget) | **PUT** /v1/organizations/{organization_id}/budget | Update Budget
 [**update_organization**](OrganizationApi.md#update_organization) | **PUT** /v1/organizations/{id} | Update Organization
 [**update_organization2**](OrganizationApi.md#update_organization2) | **PATCH** /v1/organizations/{id} | Update Organization
+[**update_organization_name**](OrganizationApi.md#update_organization_name) | **PUT** /v1/organizations/{id}/name | Update Organization
 [**update_organization_plan**](OrganizationApi.md#update_organization_plan) | **POST** /v1/organizations/{id}/plan | Update Organization plan
 [**upsert_signup_qualification**](OrganizationApi.md#upsert_signup_qualification) | **POST** /v1/organizations/{id}/signup_qualification | Upsert Organization&#39;s signup qualification
 
@@ -36,7 +37,8 @@ said organization.
 It's possible to specify a validity for the token, which defaults to 1h
 and must be no more than 24h. The format is `<number>s`, where `<number>`
 is a floating point in seconds (so `123.456789012s` means 123 seconds and
-456789012 nanoseconds). See: https://protobuf.dev/reference/php/api-docs/Google/Protobuf/Duration.html.
+456789012 nanoseconds). See:
+https://protobuf.dev/reference/php/api-docs/Google/Protobuf/Duration.html.
 
 ### Example
 
@@ -1384,6 +1386,93 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**UpdateOrganizationReply**](UpdateOrganizationReply.md)
+
+### Authorization
+
+[Bearer](../README.md#Bearer)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: */*
+
+### HTTP response details
+
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+**200** | A successful response. |  -  |
+**400** | Validation error |  -  |
+**401** | Returned when the token is not valid. |  -  |
+**403** | Returned when the user does not have permission to access the resource. |  -  |
+**404** | Returned when the resource does not exist. |  -  |
+**500** | Returned in case of server error. |  -  |
+**503** | Service is unavailable. |  -  |
+**0** | An unexpected error response. |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **update_organization_name**
+> UpdateOrganizationNameReply update_organization_name(id, body)
+
+Update Organization
+
+### Example
+
+* Api Key Authentication (Bearer):
+
+```python
+import koyeb.api
+from koyeb.api.models.update_organization_name_reply import UpdateOrganizationNameReply
+from koyeb.api.models.update_organization_name_request import UpdateOrganizationNameRequest
+from koyeb.api.rest import ApiException
+from pprint import pprint
+
+# Defining the host is optional and defaults to https://app.koyeb.com
+# See configuration.py for a list of all supported configuration parameters.
+configuration = koyeb.api.Configuration(
+    host = "https://app.koyeb.com"
+)
+
+# The client must configure the authentication and authorization parameters
+# in accordance with the API server security policy.
+# Examples for each auth method are provided below, use the example that
+# satisfies your auth use case.
+
+# Configure API key authorization: Bearer
+configuration.api_key['Bearer'] = os.environ["API_KEY"]
+
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['Bearer'] = 'Bearer'
+
+# Enter a context with an instance of the API client
+with koyeb.api.ApiClient(configuration) as api_client:
+    # Create an instance of the API class
+    api_instance = koyeb.api.OrganizationApi(api_client)
+    id = 'id_example' # str | 
+    body = koyeb.api.UpdateOrganizationNameRequest() # UpdateOrganizationNameRequest | 
+
+    try:
+        # Update Organization
+        api_response = api_instance.update_organization_name(id, body)
+        print("The response of OrganizationApi->update_organization_name:\n")
+        pprint(api_response)
+    except Exception as e:
+        print("Exception when calling OrganizationApi->update_organization_name: %s\n" % e)
+```
+
+
+
+### Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **id** | **str**|  | 
+ **body** | [**UpdateOrganizationNameRequest**](UpdateOrganizationNameRequest.md)|  | 
+
+### Return type
+
+[**UpdateOrganizationNameReply**](UpdateOrganizationNameReply.md)
 
 ### Authorization
 

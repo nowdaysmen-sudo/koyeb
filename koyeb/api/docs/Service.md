@@ -24,6 +24,7 @@ Name | Type | Description | Notes
 **latest_deployment_id** | **str** |  | [optional] 
 **last_provisioned_deployment_id** | **str** |  | [optional] 
 **state** | [**ServiceState**](ServiceState.md) |  | [optional] 
+**life_cycle** | [**ServiceLifeCycle**](ServiceLifeCycle.md) |  | [optional] 
 
 ## Example
 

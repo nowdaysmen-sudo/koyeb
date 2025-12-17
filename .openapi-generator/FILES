@@ -52,6 +52,7 @@ koyeb/api/docs/ActivityApi.md
 koyeb/api/docs/ActivityList.md
 koyeb/api/docs/App.md
 koyeb/api/docs/AppEvent.md
+koyeb/api/docs/AppLifeCycle.md
 koyeb/api/docs/AppListItem.md
 koyeb/api/docs/AppStatus.md
 koyeb/api/docs/AppUsage.md
@@ -385,6 +386,7 @@ koyeb/api/docs/SecretsApi.md
 koyeb/api/docs/SecretsSummary.md
 koyeb/api/docs/Service.md
 koyeb/api/docs/ServiceEvent.md
+koyeb/api/docs/ServiceLifeCycle.md
 koyeb/api/docs/ServiceListItem.md
 koyeb/api/docs/ServiceState.md
 koyeb/api/docs/ServiceStatus.md
@@ -420,6 +422,8 @@ koyeb/api/docs/UpdateBudgetRequest.md
 koyeb/api/docs/UpdateCredentialReply.md
 koyeb/api/docs/UpdateDomain.md
 koyeb/api/docs/UpdateDomainReply.md
+koyeb/api/docs/UpdateOrganizationNameReply.md
+koyeb/api/docs/UpdateOrganizationNameRequest.md
 koyeb/api/docs/UpdateOrganizationPlanReply.md
 koyeb/api/docs/UpdateOrganizationPlanRequest.md
 koyeb/api/docs/UpdateOrganizationReply.md
@@ -455,6 +459,7 @@ koyeb/api/models/activity.py
 koyeb/api/models/activity_list.py
 koyeb/api/models/app.py
 koyeb/api/models/app_event.py
+koyeb/api/models/app_life_cycle.py
 koyeb/api/models/app_list_item.py
 koyeb/api/models/app_status.py
 koyeb/api/models/app_usage.py
@@ -756,6 +761,7 @@ koyeb/api/models/secret_type.py
 koyeb/api/models/secrets_summary.py
 koyeb/api/models/service.py
 koyeb/api/models/service_event.py
+koyeb/api/models/service_life_cycle.py
 koyeb/api/models/service_list_item.py
 koyeb/api/models/service_state.py
 koyeb/api/models/service_status.py
@@ -785,6 +791,8 @@ koyeb/api/models/update_budget_request.py
 koyeb/api/models/update_credential_reply.py
 koyeb/api/models/update_domain.py
 koyeb/api/models/update_domain_reply.py
+koyeb/api/models/update_organization_name_reply.py
+koyeb/api/models/update_organization_name_request.py
 koyeb/api/models/update_organization_plan_reply.py
 koyeb/api/models/update_organization_plan_request.py
 koyeb/api/models/update_organization_reply.py

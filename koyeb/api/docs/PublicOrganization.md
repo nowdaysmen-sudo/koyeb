@@ -9,6 +9,7 @@ Name | Type | Description | Notes
 **name** | **str** |  | [optional] 
 **plan** | [**Plan**](Plan.md) |  | [optional] [default to Plan.HOBBY]
 **status** | [**OrganizationStatus**](OrganizationStatus.md) |  | [optional] [default to OrganizationStatus.WARNING]
+**external_id** | **str** |  | [optional] 
 
 ## Example
 
