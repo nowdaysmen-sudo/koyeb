@@ -366,7 +366,7 @@ This endpoint does not need any parameter.
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **get_current_user**
-> UserReply get_current_user()
+> UserReply get_current_user(seon_fp=seon_fp)
 
 Get Current User
 
@@ -401,10 +401,11 @@ configuration.api_key['Bearer'] = os.environ["API_KEY"]
 with koyeb.api.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = koyeb.api.ProfileApi(api_client)
+    seon_fp = 'seon_fp_example' # str | Seon Fingerprint (optional)
 
     try:
         # Get Current User
-        api_response = api_instance.get_current_user()
+        api_response = api_instance.get_current_user(seon_fp=seon_fp)
         print("The response of ProfileApi->get_current_user:\n")
         pprint(api_response)
     except Exception as e:
@@ -415,7 +416,10 @@ with koyeb.api.ApiClient(configuration) as api_client:
 
 ### Parameters
 
-This endpoint does not need any parameter.
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **seon_fp** | **str**| Seon Fingerprint | [optional] 
 
 ### Return type
 

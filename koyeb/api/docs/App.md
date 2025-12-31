@@ -19,6 +19,7 @@ Name | Type | Description | Notes
 **messages** | **List[str]** |  | [optional] 
 **version** | **str** |  | [optional] 
 **domains** | [**List[Domain]**](Domain.md) |  | [optional] 
+**life_cycle** | [**AppLifeCycle**](AppLifeCycle.md) |  | [optional] 
 
 ## Example
 

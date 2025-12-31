@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **app_id** | **str** |  | [optional] 
 **definition** | [**DeploymentDefinition**](DeploymentDefinition.md) |  | [optional] 
+**life_cycle** | [**ServiceLifeCycle**](ServiceLifeCycle.md) |  | [optional] 
 
 ## Example
 

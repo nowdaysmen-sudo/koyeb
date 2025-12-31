@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 
 from koyeb.api.api.deployments_api import DeploymentsApi
 from koyeb.api.exceptions import ApiException, NotFoundException
-from koyeb.api.models.create_app import CreateApp
-from koyeb.api.models.create_service import CreateService
+from koyeb.api.models.create_app import CreateApp, AppLifeCycle
+from koyeb.api.models.create_service import CreateService, ServiceLifeCycle
 
 from .utils import (
     DEFAULT_INSTANCE_WAIT_TIMEOUT,
@@ -114,6 +114,8 @@ class Sandbox:
         privileged: bool = False,
         registry_secret: Optional[str] = None,
         _experimental_enable_light_sleep: bool = False,
+        delete_after_delay: int = 0,
+        delete_after_inactivity_delay: int = 0,
     ) -> Sandbox:
         """
             Create a new sandbox instance.
@@ -141,6 +143,10 @@ class Sandbox:
                     pulling private images. Create the secret via Koyeb dashboard or CLI first.
                 _experimental_enable_light_sleep: If True, uses idle_timeout for light_sleep and sets
                     deep_sleep=3900. If False, uses idle_timeout for deep_sleep (default: False)
+                delete_after_create: If >0, automatically delete the sandbox if there was no activity
+                    after this many seconds since creation.
+                delete_after_sleep: If >0, automatically delete the sandbox if service sleeps due to inactivity
+                    after this many seconds.
 
         Returns:
                 Sandbox: A new Sandbox instance
@@ -180,6 +186,8 @@ class Sandbox:
             privileged=privileged,
             registry_secret=registry_secret,
             _experimental_enable_light_sleep=_experimental_enable_light_sleep,
+            delete_after_delay=delete_after_delay,
+            delete_after_inactivity_delay=delete_after_inactivity_delay,
         )
 
         if wait_ready:
@@ -204,16 +212,19 @@ class Sandbox:
         region: Optional[str] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
-        idle_timeout: int = 300,
+        idle_timeout: int = 0,
         enable_tcp_proxy: bool = False,
         privileged: bool = False,
         registry_secret: Optional[str] = None,
         _experimental_enable_light_sleep: bool = False,
+        delete_after_delay: int = 0,
+        delete_after_inactivity_delay: int = 0,
     ) -> Sandbox:
         """
         Synchronous creation method that returns creation parameters.
         Subclasses can override to return their own type.
         """
+
         apps_api, services_api, _, catalog_instances_api = get_api_client(api_token)
 
         # Always create routes (ports are always exposed, default to "http")
@@ -228,13 +239,18 @@ class Sandbox:
         env["SANDBOX_SECRET"] = sandbox_secret
 
         app_name = f"sandbox-app-{name}-{int(time.time())}"
-        app_response = apps_api.create_app(app=CreateApp(name=app_name))
+        app_response = apps_api.create_app(
+            app=CreateApp(
+                name=app_name, life_cycle=AppLifeCycle(delete_when_empty=True)
+            )
+        )
         app_id = app_response.app.id
 
         env_vars = build_env_vars(env)
         docker_source = create_docker_source(
             image, [], privileged=privileged, image_registry_secret=registry_secret
         )
+
         deployment_definition = create_deployment_definition(
             name=name,
             docker_source=docker_source,
@@ -248,7 +264,15 @@ class Sandbox:
             _experimental_enable_light_sleep=_experimental_enable_light_sleep,
         )
 
-        create_service = CreateService(app_id=app_id, definition=deployment_definition)
+        service_life_cycle = ServiceLifeCycle(
+            delete_after_create=delete_after_delay,
+            delete_after_sleep=delete_after_inactivity_delay,
+        )
+        create_service = CreateService(
+            app_id=app_id,
+            definition=deployment_definition,
+            life_cycle=service_life_cycle,
+        )
         service_response = services_api.create_service(service=create_service)
         service_id = service_response.service.id
 
@@ -864,11 +888,13 @@ class AsyncSandbox(Sandbox):
         region: Optional[str] = None,
         api_token: Optional[str] = None,
         timeout: int = 300,
-        idle_timeout: int = 300,
+        idle_timeout: int = 0,
         enable_tcp_proxy: bool = False,
         privileged: bool = False,
         registry_secret: Optional[str] = None,
         _experimental_enable_light_sleep: bool = False,
+        delete_after_delay: int = 0,
+        delete_after_inactivity_delay: int = 0,
     ) -> AsyncSandbox:
         """
             Create a new sandbox instance with async support.
@@ -896,6 +922,10 @@ class AsyncSandbox(Sandbox):
                     pulling private images. Create the secret via Koyeb dashboard or CLI first.
                 _experimental_enable_light_sleep: If True, uses idle_timeout for light_sleep and sets
                     deep_sleep=3900. If False, uses idle_timeout for deep_sleep (default: False)
+                delete_after_delay: If >0, automatically delete the sandbox if there was no activity
+                    after this many seconds since creation.
+                delete_after_inactivity_delay: If >0, automatically delete the sandbox if service sleeps due to inactivity
+                    after this many seconds.
 
         Returns:
                 AsyncSandbox: A new AsyncSandbox instance
@@ -928,6 +958,8 @@ class AsyncSandbox(Sandbox):
                 privileged=privileged,
                 registry_secret=registry_secret,
                 _experimental_enable_light_sleep=_experimental_enable_light_sleep,
+                delete_after_delay=delete_after_delay,
+                delete_after_inactivity_delay=delete_after_inactivity_delay,
             ),
         )
 
