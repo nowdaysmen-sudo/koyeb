@@ -4287,20 +4287,6 @@
             "in": "query",
             "required": false,
             "type": "boolean"
-          },
-          {
-            "name": "life_cycle.delete_after_sleep",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "life_cycle.delete_after_create",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
           }
         ],
         "tags": [
@@ -4382,20 +4368,6 @@
             "in": "query",
             "required": false,
             "type": "boolean"
-          },
-          {
-            "name": "life_cycle.delete_after_sleep",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "life_cycle.delete_after_create",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
           }
         ],
         "tags": [
@@ -16044,6 +16016,9 @@
         },
         "latest_deployment_id": {
           "type": "string"
+        },
+        "life_cycle": {
+          "$ref": "#/definitions/ServiceLifeCycle"
         }
       }
     },

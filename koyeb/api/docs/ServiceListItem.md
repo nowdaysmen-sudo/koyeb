@@ -18,6 +18,7 @@ Name | Type | Description | Notes
 **state** | [**ServiceState**](ServiceState.md) |  | [optional] 
 **active_deployment_id** | **str** |  | [optional] 
 **latest_deployment_id** | **str** |  | [optional] 
+**life_cycle** | [**ServiceLifeCycle**](ServiceLifeCycle.md) |  | [optional] 
 
 ## Example
 

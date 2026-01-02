@@ -20,6 +20,7 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from koyeb.api.models.service_life_cycle import ServiceLifeCycle
 from koyeb.api.models.service_state import ServiceState
 from koyeb.api.models.service_status import ServiceStatus
 from koyeb.api.models.service_type import ServiceType
@@ -45,6 +46,7 @@ class ServiceListItem(BaseModel):
     state: Optional[ServiceState] = None
     active_deployment_id: Optional[StrictStr] = None
     latest_deployment_id: Optional[StrictStr] = None
+    life_cycle: Optional[ServiceLifeCycle] = None
     __properties: ClassVar[List[str]] = [
         "id",
         "name",
@@ -59,6 +61,7 @@ class ServiceListItem(BaseModel):
         "state",
         "active_deployment_id",
         "latest_deployment_id",
+        "life_cycle",
     ]
 
     model_config = ConfigDict(
@@ -101,6 +104,9 @@ class ServiceListItem(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of state
         if self.state:
             _dict["state"] = self.state.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of life_cycle
+        if self.life_cycle:
+            _dict["life_cycle"] = self.life_cycle.to_dict()
         return _dict
 
     @classmethod
@@ -139,6 +145,11 @@ class ServiceListItem(BaseModel):
                 ),
                 "active_deployment_id": obj.get("active_deployment_id"),
                 "latest_deployment_id": obj.get("latest_deployment_id"),
+                "life_cycle": (
+                    ServiceLifeCycle.from_dict(obj["life_cycle"])
+                    if obj.get("life_cycle") is not None
+                    else None
+                ),
             }
         )
         return _obj

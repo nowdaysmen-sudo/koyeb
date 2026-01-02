@@ -16,7 +16,7 @@ from pydantic import validate_call, Field, StrictFloat, StrictStr, StrictInt
 from typing import Any, Dict, List, Optional, Tuple, Union
 from typing_extensions import Annotated
 
-from pydantic import Field, StrictBool, StrictInt, StrictStr, field_validator
+from pydantic import Field, StrictBool, StrictStr, field_validator
 from typing import Any, Dict, List, Optional
 from typing_extensions import Annotated
 from koyeb.api.models.autocomplete_reply import AutocompleteReply
@@ -2711,8 +2711,6 @@ class ServicesApi:
                 description="If set, run validation and check that the service exists"
             ),
         ] = None,
-        life_cycle_delete_after_sleep: Optional[StrictInt] = None,
-        life_cycle_delete_after_create: Optional[StrictInt] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -2734,10 +2732,6 @@ class ServicesApi:
         :type service: UpdateService
         :param dry_run: If set, run validation and check that the service exists
         :type dry_run: bool
-        :param life_cycle_delete_after_sleep:
-        :type life_cycle_delete_after_sleep: int
-        :param life_cycle_delete_after_create:
-        :type life_cycle_delete_after_create: int
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -2764,8 +2758,6 @@ class ServicesApi:
             id=id,
             service=service,
             dry_run=dry_run,
-            life_cycle_delete_after_sleep=life_cycle_delete_after_sleep,
-            life_cycle_delete_after_create=life_cycle_delete_after_create,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -2801,8 +2793,6 @@ class ServicesApi:
                 description="If set, run validation and check that the service exists"
             ),
         ] = None,
-        life_cycle_delete_after_sleep: Optional[StrictInt] = None,
-        life_cycle_delete_after_create: Optional[StrictInt] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -2824,10 +2814,6 @@ class ServicesApi:
         :type service: UpdateService
         :param dry_run: If set, run validation and check that the service exists
         :type dry_run: bool
-        :param life_cycle_delete_after_sleep:
-        :type life_cycle_delete_after_sleep: int
-        :param life_cycle_delete_after_create:
-        :type life_cycle_delete_after_create: int
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -2854,8 +2840,6 @@ class ServicesApi:
             id=id,
             service=service,
             dry_run=dry_run,
-            life_cycle_delete_after_sleep=life_cycle_delete_after_sleep,
-            life_cycle_delete_after_create=life_cycle_delete_after_create,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -2891,8 +2875,6 @@ class ServicesApi:
                 description="If set, run validation and check that the service exists"
             ),
         ] = None,
-        life_cycle_delete_after_sleep: Optional[StrictInt] = None,
-        life_cycle_delete_after_create: Optional[StrictInt] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -2914,10 +2896,6 @@ class ServicesApi:
         :type service: UpdateService
         :param dry_run: If set, run validation and check that the service exists
         :type dry_run: bool
-        :param life_cycle_delete_after_sleep:
-        :type life_cycle_delete_after_sleep: int
-        :param life_cycle_delete_after_create:
-        :type life_cycle_delete_after_create: int
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -2944,8 +2922,6 @@ class ServicesApi:
             id=id,
             service=service,
             dry_run=dry_run,
-            life_cycle_delete_after_sleep=life_cycle_delete_after_sleep,
-            life_cycle_delete_after_create=life_cycle_delete_after_create,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -2971,8 +2947,6 @@ class ServicesApi:
         id,
         service,
         dry_run,
-        life_cycle_delete_after_sleep,
-        life_cycle_delete_after_create,
         _request_auth,
         _content_type,
         _headers,
@@ -2999,18 +2973,6 @@ class ServicesApi:
         if dry_run is not None:
 
             _query_params.append(("dry_run", dry_run))
-
-        if life_cycle_delete_after_sleep is not None:
-
-            _query_params.append(
-                ("life_cycle.delete_after_sleep", life_cycle_delete_after_sleep)
-            )
-
-        if life_cycle_delete_after_create is not None:
-
-            _query_params.append(
-                ("life_cycle.delete_after_create", life_cycle_delete_after_create)
-            )
 
         # process the header parameters
         # process the form parameters
@@ -3051,8 +3013,6 @@ class ServicesApi:
                 description="If set, run validation and check that the service exists"
             ),
         ] = None,
-        life_cycle_delete_after_sleep: Optional[StrictInt] = None,
-        life_cycle_delete_after_create: Optional[StrictInt] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -3074,10 +3034,6 @@ class ServicesApi:
         :type service: UpdateService
         :param dry_run: If set, run validation and check that the service exists
         :type dry_run: bool
-        :param life_cycle_delete_after_sleep:
-        :type life_cycle_delete_after_sleep: int
-        :param life_cycle_delete_after_create:
-        :type life_cycle_delete_after_create: int
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -3104,8 +3060,6 @@ class ServicesApi:
             id=id,
             service=service,
             dry_run=dry_run,
-            life_cycle_delete_after_sleep=life_cycle_delete_after_sleep,
-            life_cycle_delete_after_create=life_cycle_delete_after_create,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -3141,8 +3095,6 @@ class ServicesApi:
                 description="If set, run validation and check that the service exists"
             ),
         ] = None,
-        life_cycle_delete_after_sleep: Optional[StrictInt] = None,
-        life_cycle_delete_after_create: Optional[StrictInt] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -3164,10 +3116,6 @@ class ServicesApi:
         :type service: UpdateService
         :param dry_run: If set, run validation and check that the service exists
         :type dry_run: bool
-        :param life_cycle_delete_after_sleep:
-        :type life_cycle_delete_after_sleep: int
-        :param life_cycle_delete_after_create:
-        :type life_cycle_delete_after_create: int
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -3194,8 +3142,6 @@ class ServicesApi:
             id=id,
             service=service,
             dry_run=dry_run,
-            life_cycle_delete_after_sleep=life_cycle_delete_after_sleep,
-            life_cycle_delete_after_create=life_cycle_delete_after_create,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -3231,8 +3177,6 @@ class ServicesApi:
                 description="If set, run validation and check that the service exists"
             ),
         ] = None,
-        life_cycle_delete_after_sleep: Optional[StrictInt] = None,
-        life_cycle_delete_after_create: Optional[StrictInt] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -3254,10 +3198,6 @@ class ServicesApi:
         :type service: UpdateService
         :param dry_run: If set, run validation and check that the service exists
         :type dry_run: bool
-        :param life_cycle_delete_after_sleep:
-        :type life_cycle_delete_after_sleep: int
-        :param life_cycle_delete_after_create:
-        :type life_cycle_delete_after_create: int
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -3284,8 +3224,6 @@ class ServicesApi:
             id=id,
             service=service,
             dry_run=dry_run,
-            life_cycle_delete_after_sleep=life_cycle_delete_after_sleep,
-            life_cycle_delete_after_create=life_cycle_delete_after_create,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -3311,8 +3249,6 @@ class ServicesApi:
         id,
         service,
         dry_run,
-        life_cycle_delete_after_sleep,
-        life_cycle_delete_after_create,
         _request_auth,
         _content_type,
         _headers,
@@ -3339,18 +3275,6 @@ class ServicesApi:
         if dry_run is not None:
 
             _query_params.append(("dry_run", dry_run))
-
-        if life_cycle_delete_after_sleep is not None:
-
-            _query_params.append(
-                ("life_cycle.delete_after_sleep", life_cycle_delete_after_sleep)
-            )
-
-        if life_cycle_delete_after_create is not None:
-
-            _query_params.append(
-                ("life_cycle.delete_after_create", life_cycle_delete_after_create)
-            )
 
         # process the header parameters
         # process the form parameters
