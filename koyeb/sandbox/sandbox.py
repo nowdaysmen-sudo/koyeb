@@ -822,7 +822,7 @@ class Sandbox:
             SandboxError: If updating life cycle fails
 
         Example:
-            >>> sandbox.update_life_cycle(delete_after_create=600, delete_after_sleep=300)
+            >>> sandbox.update_life_cycle(delete_after_delay=600, delete_after_inactivity=300)
         """
         try:
             _, services_api, _, _, deployments_api = get_api_client(self.api_token)
