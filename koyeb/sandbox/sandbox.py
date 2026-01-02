@@ -17,6 +17,7 @@ from koyeb.api.api.deployments_api import DeploymentsApi
 from koyeb.api.exceptions import ApiException, NotFoundException
 from koyeb.api.models.create_app import CreateApp, AppLifeCycle
 from koyeb.api.models.create_service import CreateService, ServiceLifeCycle
+from koyeb.api.models.update_service import UpdateService
 
 from .utils import (
     DEFAULT_INSTANCE_WAIT_TIMEOUT,
@@ -225,7 +226,7 @@ class Sandbox:
         Subclasses can override to return their own type.
         """
 
-        apps_api, services_api, _, catalog_instances_api = get_api_client(api_token)
+        apps_api, services_api, _, _, _ = get_api_client(api_token)
 
         # Always create routes (ports are always exposed, default to "http")
         routes = create_koyeb_sandbox_routes()
@@ -315,7 +316,7 @@ class Sandbox:
         if not id:
             raise ValueError("id is required")
 
-        _, services_api, _, _ = get_api_client(api_token)
+        _, services_api, _, _, _ = get_api_client(api_token)
         deployments_api = DeploymentsApi(services_api.api_client)
 
         # Get service by ID
@@ -429,7 +430,7 @@ class Sandbox:
 
     def delete(self) -> None:
         """Delete the sandbox instance."""
-        apps_api, _, _, _ = get_api_client(self.api_token)
+        apps_api, _, _, _, _ = get_api_client(self.api_token)
         apps_api.delete_app(self.app_id)
 
     def get_domain(self) -> Optional[str]:
@@ -447,12 +448,11 @@ class Sandbox:
 
             from .utils import get_api_client
 
-            _, services_api, _, _ = get_api_client(self.api_token)
+            apps_api, services_api, _, _, _ = get_api_client(self.api_token)
             service_response = services_api.get_service(self.service_id)
             service = service_response.service
 
             if service.app_id:
-                apps_api, _, _, _ = get_api_client(self.api_token)
                 app_response = apps_api.get_app(service.app_id)
                 app = app_response.app
                 if hasattr(app, "domains") and app.domains:
@@ -477,7 +477,7 @@ class Sandbox:
 
             from .utils import get_api_client
 
-            _, services_api, _, _ = get_api_client(self.api_token)
+            _, services_api, _, _, _ = get_api_client(self.api_token)
             service_response = services_api.get_service(self.service_id)
             service = service_response.service
 
@@ -803,6 +803,59 @@ class Sandbox:
                     # Continue killing other processes even if one fails
                     pass
         return killed_count
+
+    def update_life_cycle(
+        self,
+        delete_after_delay: Optional[int] = None,
+        delete_after_inactivity: Optional[int] = None,
+    ) -> None:
+        """
+        Update the sandbox's life cycle settings.
+
+        Args:
+            delete_after_delay: If >0, automatically delete the sandbox if there was no activity
+                after this many seconds since creation.
+            delete_after_inactivity: If >0, automatically delete the sandbox if service sleeps due to inactivity
+                after this many seconds.
+
+        Raises:
+            SandboxError: If updating life cycle fails
+
+        Example:
+            >>> sandbox.update_life_cycle(delete_after_create=600, delete_after_sleep=300)
+        """
+        try:
+            _, services_api, _, _, deployments_api = get_api_client(self.api_token)
+            service_response = services_api.get_service(self.service_id)
+            service = service_response.service
+
+            deployment_response = deployments_api.get_deployment(
+                service.latest_deployment_id
+            )
+            deployment = deployment_response.deployment
+
+            if not service:
+                raise SandboxError("Sandbox service not found")
+
+            # Update life cycle settings
+            life_cycle = service.life_cycle or ServiceLifeCycle()
+            if delete_after_delay is not None:
+                life_cycle.delete_after_create = delete_after_delay
+            if delete_after_inactivity is not None:
+                life_cycle.delete_after_sleep = delete_after_inactivity
+
+            # Send update request
+            services_api.update_service(
+                id=self.service_id,
+                service=UpdateService(
+                    definition=deployment.definition,
+                    life_cycle=life_cycle,
+                ),
+            )
+        except Exception as e:
+            if isinstance(e, SandboxError):
+                raise
+            raise SandboxError(f"Failed to update life cycle: {str(e)}")
 
     def __enter__(self) -> "Sandbox":
         """Context manager entry - returns self."""

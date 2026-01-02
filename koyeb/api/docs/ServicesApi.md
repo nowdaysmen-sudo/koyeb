@@ -814,7 +814,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **update_service**
-> UpdateServiceReply update_service(id, service, dry_run=dry_run, life_cycle_delete_after_sleep=life_cycle_delete_after_sleep, life_cycle_delete_after_create=life_cycle_delete_after_create)
+> UpdateServiceReply update_service(id, service, dry_run=dry_run)
 
 Update Service
 
@@ -853,12 +853,10 @@ with koyeb.api.ApiClient(configuration) as api_client:
     id = 'id_example' # str | The id of the entity to update
     service = koyeb.api.UpdateService() # UpdateService | 
     dry_run = True # bool | If set, run validation and check that the service exists (optional)
-    life_cycle_delete_after_sleep = 56 # int |  (optional)
-    life_cycle_delete_after_create = 56 # int |  (optional)
 
     try:
         # Update Service
-        api_response = api_instance.update_service(id, service, dry_run=dry_run, life_cycle_delete_after_sleep=life_cycle_delete_after_sleep, life_cycle_delete_after_create=life_cycle_delete_after_create)
+        api_response = api_instance.update_service(id, service, dry_run=dry_run)
         print("The response of ServicesApi->update_service:\n")
         pprint(api_response)
     except Exception as e:
@@ -875,8 +873,6 @@ Name | Type | Description  | Notes
  **id** | **str**| The id of the entity to update | 
  **service** | [**UpdateService**](UpdateService.md)|  | 
  **dry_run** | **bool**| If set, run validation and check that the service exists | [optional] 
- **life_cycle_delete_after_sleep** | **int**|  | [optional] 
- **life_cycle_delete_after_create** | **int**|  | [optional] 
 
 ### Return type
 
@@ -907,7 +903,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **update_service2**
-> UpdateServiceReply update_service2(id, service, dry_run=dry_run, life_cycle_delete_after_sleep=life_cycle_delete_after_sleep, life_cycle_delete_after_create=life_cycle_delete_after_create)
+> UpdateServiceReply update_service2(id, service, dry_run=dry_run)
 
 Update Service
 
@@ -946,12 +942,10 @@ with koyeb.api.ApiClient(configuration) as api_client:
     id = 'id_example' # str | The id of the entity to update
     service = koyeb.api.UpdateService() # UpdateService | 
     dry_run = True # bool | If set, run validation and check that the service exists (optional)
-    life_cycle_delete_after_sleep = 56 # int |  (optional)
-    life_cycle_delete_after_create = 56 # int |  (optional)
 
     try:
         # Update Service
-        api_response = api_instance.update_service2(id, service, dry_run=dry_run, life_cycle_delete_after_sleep=life_cycle_delete_after_sleep, life_cycle_delete_after_create=life_cycle_delete_after_create)
+        api_response = api_instance.update_service2(id, service, dry_run=dry_run)
         print("The response of ServicesApi->update_service2:\n")
         pprint(api_response)
     except Exception as e:
@@ -968,8 +962,6 @@ Name | Type | Description  | Notes
  **id** | **str**| The id of the entity to update | 
  **service** | [**UpdateService**](UpdateService.md)|  | 
  **dry_run** | **bool**| If set, run validation and check that the service exists | [optional] 
- **life_cycle_delete_after_sleep** | **int**|  | [optional] 
- **life_cycle_delete_after_create** | **int**|  | [optional] 
 
 ### Return type
 

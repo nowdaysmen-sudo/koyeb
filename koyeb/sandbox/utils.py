@@ -11,7 +11,13 @@ import shlex
 from typing import Any, Callable, Dict, List, Optional
 
 from koyeb.api import ApiClient, Configuration
-from koyeb.api.api import AppsApi, CatalogInstancesApi, InstancesApi, ServicesApi
+from koyeb.api.api import (
+    AppsApi,
+    CatalogInstancesApi,
+    InstancesApi,
+    ServicesApi,
+    DeploymentsApi,
+)
 from koyeb.api.models.deployment_definition import DeploymentDefinition
 from koyeb.api.models.deployment_definition_type import DeploymentDefinitionType
 from koyeb.api.models.deployment_env import DeploymentEnv
@@ -83,7 +89,7 @@ def _validate_port_protocol(protocol: str) -> str:
 
 def get_api_client(
     api_token: Optional[str] = None, host: Optional[str] = None
-) -> tuple[AppsApi, ServicesApi, InstancesApi, CatalogInstancesApi]:
+) -> tuple[AppsApi, ServicesApi, InstancesApi, CatalogInstancesApi, DeploymentsApi]:
     """
     Get configured API clients for Koyeb operations.
 
@@ -114,6 +120,7 @@ def get_api_client(
         ServicesApi(api_client),
         InstancesApi(api_client),
         CatalogInstancesApi(api_client),
+        DeploymentsApi(api_client),
     )
 
 
